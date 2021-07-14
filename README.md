@@ -34,7 +34,7 @@ torch.allclose(add.outputs.sum_out, torch.ones(1, 3) * 2.)
 ```bash
 git clone https://github.com/kornia/limbus
 cd limbus
-pip install -e .
+pip install -e .[dev]
 ```
 or
 

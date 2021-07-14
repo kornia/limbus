@@ -1,4 +1,4 @@
-from distutils.core import setup, find_packages
+from setuptools import setup, find_packages
 
 setup(name='limbus',
       version='0.1.0',
@@ -6,5 +6,12 @@ setup(name='limbus',
       author='Kornia.org',
       url='https://github.com/kornia/limbus',
       install_requires=['torch'],
+      extras_require={
+        'dev': [
+            'pytest',
+            'pytest-pep8',
+            'pytest-cov'
+        ]
+      },
       packages=find_packages(),
      )   
