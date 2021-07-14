@@ -4,10 +4,10 @@ on:
   # master branch.
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
   # Weekly run to account for
   # changed dependencies.
   schedule:
