@@ -60,8 +60,8 @@ jobs:
         run: pip install typing
         if: matrix.installTyping
 
-      - name: Lint
-        run: python -m flake8
+      #- name: Lint
+      #  run: python -m flake8
 
       - name: Build the code
         run: python ./setup.py build_ext -i
