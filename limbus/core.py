@@ -62,6 +62,9 @@ class Component(nn.Module):
     def forward(self, inputs: Params) -> ComponentState:
         return ComponentState.NotImplemented
 
+    @abstractmethod
+    def finish_iter(self) -> None:
+        pass
 
 @dataclass
 class _Node:
@@ -169,3 +172,7 @@ class ComponentsManager(nn.Module):
 
                 if state == ComponentState.STOPPED:
                     break
+            
+            # code to run before running the next iteration in the pipeline
+            for node_name in self._seq:
+                self.nodes[node_name].component.finish_iter()

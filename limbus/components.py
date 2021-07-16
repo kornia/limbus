@@ -1,5 +1,6 @@
 from typing import Any, List
 from pathlib import Path
+import hashlib
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -142,11 +143,14 @@ class ImageShow(Component):
             img = img[None].repeat(3, 1, 1)
         img: np.ndarray = kornia.tensor_to_image(
             img.mul(255).clamp(0, 255).int())
-        plt.figure(self._name)
-        plt.imshow(img)
-        plt.show()
+        fig = plt.figure(int(hashlib.md5(self._name.encode()).hexdigest(), 16))
+        fig.canvas.set_window_title(self._name)
+        fig.add_subplot(111).imshow(img)
+        plt.show(block=False)
         return ComponentState.OK
 
+    def finish_iter(self) -> None:
+        plt.show()
 
 class Constant(Component):
     """Component that holds a constant."""
