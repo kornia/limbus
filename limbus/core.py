@@ -76,6 +76,7 @@ class _Link:
     node: str
     pin: str
 
+
 class ComponentsManager(nn.Module):
     """Class to manage the Limbus Components.
 
@@ -148,19 +149,23 @@ class ComponentsManager(nn.Module):
 
     def execute(self) -> None:
         """Method to execute the components graph."""
-        for node_name in self._seq:
-            obj = self.nodes[node_name].component
-            pin: str
-            links: List[_Link]
-            # get values from the connected components
-            inputs = Params()
-            for pin, links in self.nodes[node_name].inputs.items():
-                # get input value for each pin
-                values = []  # for now we assume that params are passed as a list
-                for link in links:
-                    values.append(self.nodes[link.node].component.outputs[link.pin])
-                if len(links) == 1:
-                    inputs.declare(pin, values[0])
-                else:
-                    inputs.declare(pin, values)
-            obj.forward(inputs)
+        while True:
+            for node_name in self._seq:
+                obj = self.nodes[node_name].component
+                pin: str
+                links: List[_Link]
+                # get values from the connected components
+                inputs = Params()
+                for pin, links in self.nodes[node_name].inputs.items():
+                    # get input value for each pin
+                    values = []  # for now we assume that params are passed as a list
+                    for link in links:
+                        values.append(self.nodes[link.node].component.outputs[link.pin])
+                    if len(links) == 1:
+                        inputs.declare(pin, values[0])
+                    else:
+                        inputs.declare(pin, values)
+                state = obj.forward(inputs)
+
+                if state == ComponentState.STOPPED:
+                    break

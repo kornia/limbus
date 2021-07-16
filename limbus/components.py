@@ -37,11 +37,11 @@ class ImageReader(Component):
                 image: torch.Tensor = kornia.image_to_tensor(np.asarray(PIL.Image.open(str(self._value[self._idx]))))
                 break
             except:
-                pass
             self._idx += 1
         # images must be in the range [0, 1]
         image = image.div(255.)
         self._outputs.image = image.clamp(0, 1)
+        self._idx += 1
         return ComponentState.OK
 
 
