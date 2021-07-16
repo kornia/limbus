@@ -37,7 +37,7 @@ class ImageReader(Component):
                 image: torch.Tensor = kornia.image_to_tensor(np.asarray(PIL.Image.open(str(self._value[self._idx]))))
                 break
             except:
-            self._idx += 1
+                self._idx += 1
         # images must be in the range [0, 1]
         image = image.div(255.)
         self._outputs.image = image.clamp(0, 1)
@@ -57,6 +57,18 @@ class RGB2HLS(Component):
         return ComponentState.OK
 
 
+class HLS2RGB(Component):
+    """Component to add two input and output the result."""
+    def __init__(self, name: str):
+        super().__init__(name)
+        self._inputs.declare("inp")
+        self._outputs.declare("out")
+
+    def forward(self, inputs: Params) -> ComponentState:
+        self._outputs.out = kornia.hls_to_rgb(inputs.inp)
+        return ComponentState.OK
+
+
 class Select(Component):
     """Component to add two input and output the result."""
     def __init__(self, name: str):
@@ -67,6 +79,53 @@ class Select(Component):
 
     def forward(self, inputs: Params) -> ComponentState:
         self._outputs.out = torch.select(inputs.inp, -3, inputs.c)
+        return ComponentState.OK
+
+
+class Unbind(Component):
+    """Component to add two input and output the result."""
+    def __init__(self, name: str, value: int):
+        super().__init__(name)
+        self._value = value
+        self._inputs.declare("inp")
+        for v in range(value):
+            self._outputs.declare(str(v))
+
+    def forward(self, inputs: Params) -> ComponentState:
+        out: List[torch.Tensor] = torch.unbind(inputs.inp, -3)
+        for idx, v in enumerate(out):
+            # NOTE: we are not controlling if we are adding more pins
+            self._outputs.declare(str(idx), v)
+        return ComponentState.OK
+
+
+class Stack(Component):
+    """Component to add two input and output the result."""
+    def __init__(self, name: str, value: int):
+        super().__init__(name)
+        self._value = value
+        for v in range(value):
+            self._inputs.declare(str(v))
+        self._outputs.declare("out")
+
+    def forward(self, inputs: Params) -> ComponentState:
+        tensors: List[torch.Tensor] = [inputs[str(idx)] for idx in range(self._value)]
+        self._outputs.out = torch.stack(tensors)
+        return ComponentState.OK
+
+class Clahe(Component):
+    """Component to add two input and output the result."""
+    def __init__(self, name: str):
+        super().__init__(name)
+        self._inputs.declare("inp")
+        self._inputs.declare("clip_limit")
+        self._inputs.declare("grid_size")
+        self._outputs.declare("out")
+
+    def forward(self, inputs: Params) -> ComponentState:
+        self._outputs.out = (
+            kornia.enhance.equalize_clahe(inputs.inp[None], inputs.clip_limit, inputs.grid_size))
+        self._outputs.out.squeeze_(0)
         return ComponentState.OK
 
 
