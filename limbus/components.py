@@ -46,7 +46,7 @@ class ImageReader(Component):
 
 
 class RGB2HLS(Component):
-    """Component to add two input and output the result."""
+    """Component to convert a rgb image to hls."""
     def __init__(self, name: str):
         super().__init__(name)
         self._inputs.declare("inp")
@@ -58,7 +58,7 @@ class RGB2HLS(Component):
 
 
 class HLS2RGB(Component):
-    """Component to add two input and output the result."""
+    """Component to convert a hls image to rgb."""
     def __init__(self, name: str):
         super().__init__(name)
         self._inputs.declare("inp")
@@ -70,7 +70,7 @@ class HLS2RGB(Component):
 
 
 class Select(Component):
-    """Component to add two input and output the result."""
+    """Component to select one channels of an image."""
     def __init__(self, name: str):
         super().__init__(name)
         self._inputs.declare("c")
@@ -83,7 +83,7 @@ class Select(Component):
 
 
 class Unbind(Component):
-    """Component to add two input and output the result."""
+    """Component to unbind one tensor."""
     def __init__(self, name: str, value: int):
         super().__init__(name)
         self._value = value
@@ -100,7 +100,7 @@ class Unbind(Component):
 
 
 class Stack(Component):
-    """Component to add two input and output the result."""
+    """Component to stack tensors."""
     def __init__(self, name: str, value: int):
         super().__init__(name)
         self._value = value
@@ -113,8 +113,9 @@ class Stack(Component):
         self._outputs.out = torch.stack(tensors)
         return ComponentState.OK
 
+
 class Clahe(Component):
-    """Component to add two input and output the result."""
+    """Component to apply clahe and output the result."""
     def __init__(self, name: str):
         super().__init__(name)
         self._inputs.declare("inp")
@@ -130,7 +131,7 @@ class Clahe(Component):
 
 
 class ImageShow(Component):
-    """Component to print the input in the console."""
+    """Component to show the input image."""
     def __init__(self, name: str):
         super().__init__(name)
         self._inputs.declare("image")
