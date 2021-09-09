@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 import PIL
 import torch
+from torch.utils.tensorboard import SummaryWriter
 import kornia
 
 from limbus.core import Component, ComponentState, Params
@@ -120,8 +121,8 @@ class Clahe(Component):
     def __init__(self, name: str):
         super().__init__(name)
         self._inputs.declare("inp")
-        self._inputs.declare("clip_limit")
-        self._inputs.declare("grid_size")
+        self._inputs.declare("clip_limit", 2.)  # added default params
+        self._inputs.declare("grid_size", (8, 8))
         self._outputs.declare("out")
 
     def forward(self, inputs: Params) -> ComponentState:
@@ -131,7 +132,7 @@ class Clahe(Component):
         return ComponentState.OK
 
 
-class ImageShow(Component):
+class ImageShow2(Component):
     """Component to show the input image."""
     def __init__(self, name: str):
         super().__init__(name)
@@ -151,6 +152,25 @@ class ImageShow(Component):
 
     def finish_iter(self) -> None:
         plt.show()
+
+
+class ImageShow(Component):
+    """Component to show the input image."""
+    def __init__(self, name: str):
+        super().__init__(name)
+        self._inputs.declare("image")
+        self._writer = SummaryWriter('tensorboard')
+
+    def forward(self, inputs: Params) -> ComponentState:
+        self._writer.add_image(self.name, inputs.image)
+        return ComponentState.OK
+
+    def finish_iter(self) -> None:
+        self._writer.flush()
+
+    def __del__(self):
+        self._writer.close()
+
 
 class Constant(Component):
     """Component that holds a constant."""
@@ -176,7 +196,7 @@ class Printer(Component):
 
 
 class Adder(Component):
-    """Component to add two input and output the result."""
+    """Component to add two inputs and output the result."""
     def __init__(self, name: str):
         super().__init__(name)
         self._inputs.declare("a")
@@ -185,4 +205,17 @@ class Adder(Component):
 
     def forward(self, inputs: Params) -> ComponentState:
         self._outputs.sum_out = inputs.a + inputs.b
+        return ComponentState.OK
+
+
+class Multiplier(Component):
+    """Component to multiply two inputs and output the result."""
+    def __init__(self, name: str):
+        super().__init__(name)
+        self._inputs.declare("a")
+        self._inputs.declare("b")
+        self._outputs.declare("sum_out")
+
+    def forward(self, inputs: Params) -> ComponentState:
+        self._outputs.sum_out = inputs.a * inputs.b
         return ComponentState.OK

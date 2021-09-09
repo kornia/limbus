@@ -2,8 +2,12 @@ from abc import abstractmethod
 from typing import Dict, Any, List, Collection
 from enum import Enum
 from dataclasses import dataclass
+import logging
 
 import torch.nn as nn
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 
 
 class ComponentState(Enum):
@@ -66,18 +70,24 @@ class Component(nn.Module):
     def finish_iter(self) -> None:
         pass
 
-@dataclass
-class _Node:
-    type: NodeType
-    component: Component
-    inputs: Dict[Any, List]
-    outputs: Dict[Any, List]
-
 
 @dataclass
 class _Link:
     node: str
     pin: str
+
+
+@dataclass
+class _Node:
+    type: NodeType
+    component: Component
+    inputs: Dict[Any, List[_Link]]
+    outputs: Dict[Any, List[_Link]]
+
+
+class DefaultParam():
+    """Trick to denote when to use a default parameter."""
+    pass
 
 
 class ComponentsManager(nn.Module):
@@ -86,17 +96,18 @@ class ComponentsManager(nn.Module):
     It holds the logic to construct the pipeline to link components.
     """
     def __init__(self):
-        self.nodes: Dict[str, _Node]= {}
+        self.nodes: Dict[str, _Node] = {}
         self._seq = []
 
     def connect(self, _from: Component, _from_name: str, _to: Component, _to_name: str) -> None:
-        """Method to connect one component output to another component input.
+        """Connect one component output to another component input.
 
         Args:
             _from: the origin component instance.
             _from_name: the origin component member name.
             _to: the destination component instance.
             _to_name: the destination component member name.
+
         """
         for comp in [_from, _to]:
             if comp.name not in self.nodes.keys():
@@ -122,20 +133,32 @@ class ComponentsManager(nn.Module):
         self.nodes[_to.name].inputs[_to_name].append(_Link(_from.name, _from_name))
 
     def _traverse(self, node_name) -> None:
-        pins: Collection[List[_Link]] = self.nodes[node_name].outputs.values()
-        pin: List[_Link]
+        out_pins: Dict[Any, List[_Link]] = self.nodes[node_name].outputs
+        inp_links: List[_Link]
         link: _Link
-        for pin in pins:
-            for link in pin:
-                node: _Node = self.nodes[link.node]
+        for inp_links in out_pins.values():
+            # each output pin can be linked to several input pins
+            for link in inp_links:
+                next_inp_link: bool = False
+                dst_node: _Node = self.nodes[link.node]
                 # check if all the components required by the input pins are added
-                inp_links: List[_Link]
-                for _, inp_links in node.inputs.items():
-                    # check that all the connections for that link are added
-                    for inp_link in inp_links:
-                        if inp_link.node not in self._seq:
-                            return
-                self._seq.append(link.node)
+                dst_inp_pin: List[_Link]
+                for _, dst_inp_pin in dst_node.inputs.items():
+                    # check that all the connected nodes for that link are added
+                    for out_src_link in dst_inp_pin:
+                        # if not all the source nodes are already in teh seq, we need to add them before
+                        if out_src_link.node not in self._seq:
+                            # jump to the next link in the list
+                            next_inp_link = True
+                            break
+                    if next_inp_link:
+                        break
+                if next_inp_link:
+                    continue
+                # add dst_node id to the list
+                if link.node not in self._seq:
+                    self._seq.append(link.node)
+                # continue the traverse once all the input links are processed
                 self._traverse(link.node)
 
     def traverse(self) -> None:
@@ -151,8 +174,12 @@ class ComponentsManager(nn.Module):
                 self._traverse(node_name)
 
     def execute(self) -> None:
-        """Method to execute the components graph."""
+        """Execute the components graph."""
+        state = ComponentState.STOPPED
+        count = 1
         while True:
+            log.info(f"Iteration {count}")
+            count += 1
             for node_name in self._seq:
                 obj = self.nodes[node_name].component
                 pin: str
@@ -163,7 +190,11 @@ class ComponentsManager(nn.Module):
                     # get input value for each pin
                     values = []  # for now we assume that params are passed as a list
                     for link in links:
-                        values.append(self.nodes[link.node].component.outputs[link.pin])
+                        value: Any = self.nodes[link.node].component.outputs[link.pin]
+                        if isinstance(value, DefaultParam):
+                            values.append(obj.inputs[pin])
+                        else:
+                            values.append(value)
                     if len(links) == 1:
                         inputs.declare(pin, values[0])
                     else:
@@ -172,7 +203,10 @@ class ComponentsManager(nn.Module):
 
                 if state == ComponentState.STOPPED:
                     break
-            
+
             # code to run before running the next iteration in the pipeline
             for node_name in self._seq:
                 self.nodes[node_name].component.finish_iter()
+            if state == ComponentState.STOPPED:
+                log.info("DONE")
+                break
