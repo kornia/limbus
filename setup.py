@@ -5,13 +5,19 @@ setup(name='limbus',
       description='Directed Acyclic processing Graph (DAG) framework for PyTorch.',
       author='Kornia.org',
       url='https://github.com/kornia/limbus',
-      install_requires=['torch'],
+      install_requires=[
+          'torch',
+          'kornia',
+          'numpy',
+          'matplotlib',
+          'tensorboard'
+      ],
       extras_require={
-        'dev': [
-            'pytest',
-            'pytest-pep8',
-            'pytest-cov'
-        ]
+          'dev': [
+              'pytest',
+              'pytest-pep8',
+              'pytest-cov'
+          ]
       },
       packages=find_packages(),
-     )   
+      )
