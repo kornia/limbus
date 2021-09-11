@@ -20,13 +20,13 @@ show = Printer("print")
 manager = ComponentsManager()
 manager.connect(c1, "out", add, "a")
 manager.connect(c2, "out", add, "b")
-manager.connect(add, "sum_out", show, "inp")
+manager.connect(add, "out", show, "inp")
 
 # run your pipeline
 manager.traverse()
 manager.execute()
 
-torch.allclose(add.outputs.sum_out, torch.ones(1, 3) * 2.)
+torch.allclose(add.outputsout, torch.ones(1, 3) * 2.)
 ```
 
 ## Installation

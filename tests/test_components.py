@@ -1,6 +1,7 @@
 import pytest
 
 from limbus.components import Constant, Adder
+from limbus.core import NoValue
 import torch
 
 
@@ -9,19 +10,19 @@ class TestConstant:
     def test_smoke(self, value):
         c = Constant("k", value)
         assert c.name == "k"
-        assert c.outputs.out is None
+        assert isinstance(c.outputs.out, NoValue)
 
-        c.forward(c.inputs, c.outputs)
+        c.forward(c.inputs)
         assert c.outputs.out == value
 
 
 class TestAdder:
-    def test_smoke(sel):
+    def test_smoke(self):
         add = Adder("add")
         assert add.name == "add"
-        assert add.outputs.sum_out is None
+        assert isinstance(add.outputs.out, NoValue)
 
-        add.inputs.a = 2.
+        add.inputs.a = torch.tensor(2.)
         add.inputs.b = torch.tensor(3.)
-        add.forward(add.inputs, add.outputs)
-        assert add.outputs.sum_out == torch.tensor(5.)
+        add.forward(add.inputs)
+        assert add.outputs.out == torch.tensor(5.)

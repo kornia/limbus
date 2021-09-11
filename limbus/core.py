@@ -1,8 +1,11 @@
+"""Core methods to manage components."""
 from abc import abstractmethod
-from typing import Dict, Any, List, Collection
+from typing import Dict, Any, List, Collection, Optional, Type
+from typeguard import check_type
 from enum import Enum
 from dataclasses import dataclass
 import logging
+import time
 
 import torch.nn as nn
 
@@ -11,20 +14,78 @@ log = logging.getLogger(__name__)
 
 
 class ComponentState(Enum):
+    """Possible states for the components."""
     STOPPED = 0
     OK = 1
     NotImplemented = -1
 
 
 class NodeType(Enum):
+    """Types of nodes."""
     Start = 0
     Mid = 1
     End = 2
 
 
+class NoValue():
+    """Denote that a param does not have a value."""
+    pass
+
+
 class Params:
     """Class to store parameters."""
-    def declare(self, name: str, value: Any = None):
+    def __init__(self) -> None:
+        self._types: dict[str, Any] = {}
+
+    def declare(self, name: str, tp: Type = object, value: Any = NoValue()) -> None:
+        """Add or modify a param.
+
+        Args:
+            name: name of the parameter.
+            tp: type (e.g. str, int, list, Union[str, int]...).
+            value (optional): value for the parameter. Default: None.
+
+        """
+        if not isinstance(value, NoValue):
+            check_type("value", value, tp)
+        setattr(self, name, value)
+        if isinstance(type(List), type):
+            self._types[name] = tp
+        else:
+            self._types[name] = tp
+
+    def get_params(self) -> Collection[str]:
+        """Return the name of all the params."""
+        return self._types.keys()
+
+    def get_type(self, name: str) -> Type:
+        """Return the type of a given param.
+
+        Args:
+            name: name of the param.
+
+        """
+        return self._types[name]
+
+    def get_param(self, name: str) -> Any:
+        """Return the param value after checking the type.
+
+        Args:
+            name: name of the param.
+
+        """
+        check_type(name, getattr(self, name), self.get_type(name))
+        return getattr(self, name)
+
+    def set_param(self, name: str, value: Any) -> None:
+        """Set the param value after checking the type.
+
+        Args:
+            name: name of the param.
+            value: value to be setted.
+
+        """
+        check_type(name, value, self.get_type(name))
         setattr(self, name, value)
 
     def __getitem__(self, name: str) -> Any:
@@ -52,22 +113,32 @@ class Component(nn.Module):
 
     @property
     def name(self) -> str:
+        """Name of the component."""
         return self._name
 
     @property
     def inputs(self) -> Params:
+        """Get the set of component inputs."""
         return self._inputs
 
     @property
     def outputs(self) -> Params:
+        """Get the set of component outputs."""
         return self._outputs
 
     @abstractmethod
     def forward(self, inputs: Params) -> ComponentState:
+        """Run the component.
+
+        Args:
+         inputs: set of values to be used to run the component.
+
+        """
         return ComponentState.NotImplemented
 
     @abstractmethod
     def finish_iter(self) -> None:
+        """Event executed when a pipeline iter is finished."""
         pass
 
 
@@ -112,8 +183,8 @@ class ComponentsManager(nn.Module):
         for comp in [_from, _to]:
             if comp.name not in self.nodes.keys():
                 # check type of component and list all the input and output pins
-                inp_keys: Collection[Any] = comp.inputs.__dict__.keys()
-                out_keys: Collection[Any] = comp.outputs.__dict__.keys()
+                inp_keys: Collection[Any] = comp.inputs.get_params()
+                out_keys: Collection[Any] = comp.outputs.get_params()
                 if not len(inp_keys) and not len(out_keys):
                     raise ValueError("No inputs and outputs provided!!!")
 
@@ -162,7 +233,7 @@ class ComponentsManager(nn.Module):
                 self._traverse(link.node)
 
     def traverse(self) -> None:
-        """Method to traverse the components graph before execution."""
+        """Traverse the components graph before execution."""
         # find start nodes
         self._seq = []
 
@@ -173,11 +244,18 @@ class ComponentsManager(nn.Module):
                 self._seq.append(node_name)
                 self._traverse(node_name)
 
-    def execute(self) -> None:
-        """Execute the components graph."""
+    def execute(self, iters: Optional[int] = None) -> None:
+        """Execute the components graph.
+
+        Args:
+            iters (optional): number of iters to be run. By default all of them are run.
+
+        """
         state = ComponentState.STOPPED
         count = 1
         while True:
+            if iters is not None and iters < count:
+                break
             log.info(f"Iteration {count}")
             count += 1
             for node_name in self._seq:
@@ -190,15 +268,15 @@ class ComponentsManager(nn.Module):
                     # get input value for each pin
                     values = []  # for now we assume that params are passed as a list
                     for link in links:
-                        value: Any = self.nodes[link.node].component.outputs[link.pin]
+                        value = self.nodes[link.node].component.outputs[link.pin]
                         if isinstance(value, DefaultParam):
                             values.append(obj.inputs[pin])
                         else:
                             values.append(value)
                     if len(links) == 1:
-                        inputs.declare(pin, values[0])
+                        inputs.declare(pin, obj.inputs.get_type(pin), values[0])
                     else:
-                        inputs.declare(pin, values)
+                        inputs.declare(pin, obj.inputs.get_type(pin), values)
                 state = obj.forward(inputs)
 
                 if state == ComponentState.STOPPED:
@@ -210,3 +288,4 @@ class ComponentsManager(nn.Module):
             if state == ComponentState.STOPPED:
                 log.info("DONE")
                 break
+            time.sleep(2)

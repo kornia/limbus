@@ -130,3 +130,6 @@ dmypy.json
 
 # vscode
 .vscode/
+
+.dev_env
+components.json

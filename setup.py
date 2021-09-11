@@ -2,21 +2,21 @@ from setuptools import setup, find_packages
 
 setup(name='limbus',
       version='0.1.0',
-      description='Directed Acyclic processing Graph (DAG) framework for PyTorch.',
+      description='High level interface to create Pytorch Graphs.',
       author='Kornia.org',
       url='https://github.com/kornia/limbus',
-      install_requires=[
-          'torch',
-          'kornia',
-          'numpy',
-          'matplotlib',
-          'tensorboard'
-      ],
+      install_requires=[],
       extras_require={
           'dev': [
               'pytest',
-              'pytest-pep8',
-              'pytest-cov'
+              'pytest-flake8',
+              'pytest-cov',
+              'pytest-mypy',
+              'pytest-pydocstyle',
+              'mypy',
+              'pydocstyle',
+              'flake8',
+              'pep8-naming'
           ]
       },
       packages=find_packages(),

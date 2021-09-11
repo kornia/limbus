@@ -1,0 +1,18 @@
+name: limbus
+
+channels:
+  - pytorch
+  - conda-forge
+
+dependencies:
+  - pip
+  - python
+  - pytorch
+  - numpy
+  - matplotlib
+  - tensorboard
+  - visdom
+  - typeguard
+
+  - pip:
+    - kornia

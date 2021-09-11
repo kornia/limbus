@@ -5,7 +5,7 @@ import torch
 
 
 def test_pipeline():
-    c1 = Constant("c1", 1.)
+    c1 = Constant("c1", 2 * torch.ones(1, 3))
     c2 = Constant("c2", torch.ones(1, 3))
 
     add = Adder("add")
@@ -14,13 +14,13 @@ def test_pipeline():
     manager = ComponentsManager()
     manager.connect(c1, "out", add, "a")
     manager.connect(c2, "out", add, "b")
-    manager.connect(add, "sum_out", show, "inp")
+    manager.connect(add, "out", show, "inp")
 
     # TODO: traverse should be called automatically with execute
     manager.traverse()
-    manager.execute()
+    manager.execute(1)
 
-    torch.allclose(add.outputs.sum_out, torch.ones(1, 3) * 2.)
+    torch.allclose(add.outputs.out, torch.ones(1, 3) * 3.)
 
     # TODO: reset nodes
     # manager.connect(c2, "out", add, "a")
