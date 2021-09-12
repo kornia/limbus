@@ -146,7 +146,7 @@ class Clahe(Component):
         return ComponentState.OK
 
 
-class ImageShow(Component):
+class ImageShowM(Component):
     """Component to show the input image."""
     def __init__(self, name: str):
         super().__init__(name)
@@ -187,7 +187,7 @@ class ImageShowTensorboard(Component):
         self._writer.close()
 
 
-class ImageShow_(Component):
+class ImageShow(Component):
     """Component to show the input image."""
     def __init__(self, name: str):
         super().__init__(name)
