@@ -24,7 +24,7 @@ manager.connect(add, "out", show, "inp")
 
 # run your pipeline
 manager.traverse()
-manager.execute()
+manager.execute(1)
 
 torch.allclose(add.outputsout, torch.ones(1, 3) * 2.)
 ```
@@ -34,10 +34,5 @@ torch.allclose(add.outputsout, torch.ones(1, 3) * 2.)
 ```bash
 git clone https://github.com/kornia/limbus
 cd limbus
-pip install -e .[dev]
-```
-or
-
-```bash
-  pip install git+https://github.com/kornia/limbus
+source path.bash.inc
 ```
