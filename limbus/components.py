@@ -2,6 +2,7 @@
 from typing import Any, List, cast, Tuple
 from pathlib import Path
 import hashlib
+import logging
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -13,6 +14,7 @@ import kornia
 
 from limbus.core import Component, ComponentState, Params
 
+log = logging.getLogger(__name__)
 
 class ImageReader(Component):
     """Component that holds a constant.
@@ -192,7 +194,16 @@ class ImageShow(Component):
     def __init__(self, name: str):
         super().__init__(name)
         self._inputs.declare("image", torch.Tensor)
-        self._visdom = visdom.Visdom(port=8087, raise_exceptions=True)
+        self._enabled = True
+        try:
+            self._visdom = visdom.Visdom(port=8087, raise_exceptions=True)
+        except:
+            self._enabled = False
+
+        if self._enabled == False:
+            log.warning("ImageShow is disabled!!!")
+            return
+
         if not self._visdom.check_connection():
             raise ConnectionError('Error connecting with the visdom server.')
 
@@ -200,8 +211,11 @@ class ImageShow(Component):
         opts = {'title': self.name}
         # TODO: for batches use `images`
         image = inputs.get_param("image")
-        self._visdom.image(image, win=self.name, opts=opts)
-        return ComponentState.OK
+        if self._enabled:
+            self._visdom.image(image, win=self.name, opts=opts)
+            return ComponentState.OK
+        # TODO: find a way to notify when the component is DISABLED or retruns an ERROR
+        return ComponentState.DISABLED
 
     def finish_iter(self) -> None:  # noqa: D102
         pass

@@ -18,6 +18,8 @@ class ComponentState(Enum):
     STOPPED = 0
     OK = 1
     NotImplemented = -1
+    ERROR = 2
+    DISABLED = 3
 
 
 class NodeType(Enum):
@@ -280,6 +282,12 @@ class ComponentsManager(nn.Module):
                 state = obj.forward(inputs)
 
                 if state == ComponentState.STOPPED:
+                    log.info(f"Component {obj.name} stopped the pipeline.")
+                    break
+                if state == ComponentState.DISABLED:
+                    log.warning(f"Component {obj.name} is DISABLED.")
+                if state == ComponentState.DISABLED:
+                    log.error(f"Component {obj.name} produced an ERROR.")
                     break
 
             # code to run before running the next iteration in the pipeline
