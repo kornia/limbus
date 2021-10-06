@@ -33,10 +33,14 @@ class ImageReader(Component):
         else:
             self._value.append(Path(path))
 
-        self._outputs.declare("image", torch.Tensor)
-        self._outputs.declare("name", str)
-        self._outputs.declare("counter", str)
-
+    @classmethod
+    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+        outputs = Params()
+        outputs.declare("image", torch.Tensor)
+        outputs.declare("name", str)
+        outputs.declare("counter", str)
+        return (Params(), outputs)
+        
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         while True:
             if self._idx >= len(self._value):
@@ -59,8 +63,14 @@ class RGB2HLS(Component):
     """Component to convert a rgb image to hls."""
     def __init__(self, name: str):
         super().__init__(name)
-        self._inputs.declare("inp", torch.Tensor)
-        self._outputs.declare("out", torch.Tensor)
+
+    @classmethod
+    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+        outputs = Params()
+        inputs = Params()
+        inputs.declare("inp", torch.Tensor)
+        outputs.declare("out", torch.Tensor)
+        return (inputs, outputs)
 
     def forward(self, inputs) -> ComponentState:  # noqa: D102
         inp = inputs.get_param("inp")
@@ -72,8 +82,14 @@ class HLS2RGB(Component):
     """Component to convert a hls image to rgb."""
     def __init__(self, name: str):
         super().__init__(name)
-        self._inputs.declare("inp", torch.Tensor)
-        self._outputs.declare("out", torch.Tensor)
+
+    @classmethod
+    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+        outputs = Params()
+        inputs = Params()
+        inputs.declare("inp", torch.Tensor)
+        outputs.declare("out", torch.Tensor)
+        return (inputs, outputs)
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         inp = inputs.get_param("inp")
@@ -85,9 +101,15 @@ class Select(Component):
     """Component to select one channels of an image."""
     def __init__(self, name: str):
         super().__init__(name)
-        self._inputs.declare("c", int)
-        self._inputs.declare("inp", torch.Tensor)
-        self._outputs.declare("out", torch.Tensor)
+
+    @classmethod
+    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+        outputs = Params()
+        inputs = Params()
+        inputs.declare("c", int)
+        inputs.declare("inp", torch.Tensor)
+        outputs.declare("out", torch.Tensor)
+        return (inputs, outputs)
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         inp = inputs.get_param("inp")
@@ -98,12 +120,20 @@ class Select(Component):
 
 class Unbind(Component):
     """Component to unbind one tensor."""
+    value = 2
+
     def __init__(self, name: str, value: int):
+        Unbind.value = value
         super().__init__(name)
-        self._value = value
-        self._inputs.declare("inp", torch.Tensor)
-        for v in range(value):
-            self._outputs.declare(str(v), torch.Tensor)
+
+    @classmethod
+    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+        outputs = Params()
+        inputs = Params()
+        inputs.declare("inp", torch.Tensor)
+        for v in range(Unbind.value):
+            outputs.declare(str(v), torch.Tensor)
+        return (inputs, outputs)
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         inp = inputs.get_param("inp")
@@ -116,12 +146,21 @@ class Unbind(Component):
 
 class Stack(Component):
     """Component to stack tensors."""
+    value = 2
+
     def __init__(self, name: str, value: int):
+        Stack.value = value
         super().__init__(name)
-        self._value = value
-        for v in range(value):
-            self._inputs.declare(str(v), torch.Tensor)
-        self._outputs.declare("out", torch.Tensor)
+
+
+    @classmethod
+    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+        outputs = Params()
+        inputs = Params()
+        for v in range(Stack.value):
+            inputs.declare(str(v), torch.Tensor)
+        outputs.declare("out", torch.Tensor)
+        return (inputs, outputs)
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         tensors: List[torch.Tensor] = [inputs[str(idx)] for idx in range(self._value)]
@@ -133,10 +172,16 @@ class Clahe(Component):
     """Component to apply clahe and output the result."""
     def __init__(self, name: str):
         super().__init__(name)
-        self._inputs.declare("inp", kornia.enhance.equalize_clahe.__annotations__["input"])
-        self._inputs.declare("clip_limit", kornia.enhance.equalize_clahe.__annotations__["clip_limit"], 2.)
-        self._inputs.declare("grid_size", kornia.enhance.equalize_clahe.__annotations__["grid_size"], (8, 8))
-        self._outputs.declare("out", torch.Tensor)
+
+    @classmethod
+    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+        outputs = Params()
+        inputs = Params()
+        inputs.declare("inp", kornia.enhance.equalize_clahe.__annotations__["input"])
+        inputs.declare("clip_limit", kornia.enhance.equalize_clahe.__annotations__["clip_limit"], 2.)
+        inputs.declare("grid_size", kornia.enhance.equalize_clahe.__annotations__["grid_size"], (8, 8))
+        outputs.declare("out", torch.Tensor)
+        return (inputs, outputs)
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         inp = inputs.get_param("inp")
@@ -151,7 +196,13 @@ class ImageShowM(Component):
     """Component to show the input image."""
     def __init__(self, name: str):
         super().__init__(name)
-        self._inputs.declare("image", torch.Tensor)
+
+    @classmethod
+    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+        outputs = Params()
+        inputs = Params()
+        inputs.declare("image", torch.Tensor)
+        return (inputs, outputs)
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         image = inputs.get_param("image")
@@ -173,8 +224,14 @@ class ImageShowTensorboard(Component):
     """Component to show the input image."""
     def __init__(self, name: str):
         super().__init__(name)
-        self._inputs.declare("image", torch.Tensor)
         self._writer = SummaryWriter('tensorboard')
+
+    @classmethod
+    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+        outputs = Params()
+        inputs = Params()
+        inputs.declare("image", torch.Tensor)
+        return (inputs, outputs)
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         image = inputs.get_param("image")
@@ -192,7 +249,6 @@ class ImageShow(Component):
     """Component to show the input image."""
     def __init__(self, name: str):
         super().__init__(name)
-        self._inputs.declare("image", torch.Tensor)
         self._enabled = True
         try:
             self._visdom = visdom.Visdom(port=8087, raise_exceptions=True)
@@ -205,6 +261,13 @@ class ImageShow(Component):
 
         if not self._visdom.check_connection():
             raise ConnectionError('Error connecting with the visdom server.')
+
+    @classmethod
+    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+        outputs = Params()
+        inputs = Params()
+        inputs.declare("image", torch.Tensor)
+        return (inputs, outputs)
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         opts = {'title': self.name}
@@ -225,7 +288,13 @@ class Constant(Component):
     def __init__(self, name: str, value: Any):
         super().__init__(name)
         self._value = value
-        self._outputs.declare("out", Any, arg="value")
+
+    @classmethod
+    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+        outputs = Params()
+        inputs = Params()
+        outputs.declare("out", Any, arg="value")
+        return (inputs, outputs)
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         # TODO: next line could be autogenerated fron the declare() method since there we are already linking both.
@@ -237,7 +306,13 @@ class Printer(Component):
     """Component to print the input in the console."""
     def __init__(self, name: str):
         super().__init__(name)
-        self._inputs.declare("inp", object)
+
+    @classmethod
+    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+        outputs = Params()
+        inputs = Params()
+        inputs.declare("inp", Any)
+        return (inputs, outputs)
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         inp = inputs.get_param("inp")
@@ -249,9 +324,15 @@ class Adder(Component):
     """Component to add two inputs and output the result."""
     def __init__(self, name: str):
         super().__init__(name)
-        self._inputs.declare("a", torch.Tensor)
-        self._inputs.declare("b", torch.Tensor)
-        self._outputs.declare("out", torch.Tensor)
+
+    @classmethod
+    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+        outputs = Params()
+        inputs = Params()
+        inputs.declare("a", torch.Tensor)
+        inputs.declare("b", torch.Tensor)
+        outputs.declare("out", torch.Tensor)
+        return (inputs, outputs)
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         a = inputs.get_param("a")
@@ -264,9 +345,15 @@ class Multiplier(Component):
     """Component to multiply two inputs and output the result."""
     def __init__(self, name: str):
         super().__init__(name)
-        self._inputs.declare("a", torch.Tensor)
-        self._inputs.declare("b", torch.Tensor)
-        self._outputs.declare("out", torch.Tensor)
+
+    @classmethod
+    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+        outputs = Params()
+        inputs = Params()
+        inputs.declare("a", torch.Tensor)
+        inputs.declare("b", torch.Tensor)
+        outputs.declare("out", torch.Tensor)
+        return (inputs, outputs)
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         a = inputs.get_param("a")

@@ -1,6 +1,6 @@
 """Core methods to manage components."""
 from abc import abstractmethod
-from typing import Dict, Any, List, Collection, Optional, Type
+from typing import Dict, Any, List, Collection, Optional, Tuple
 from typeguard import check_type
 from enum import Enum
 from dataclasses import dataclass
@@ -37,30 +37,44 @@ class NoValue():
 class Params:
     """Class to store parameters."""
     def __init__(self) -> None:
-        self._types: dict[str, Any] = {}
+        self._types: Dict[str, Any] = {}
+        self._args: Dict[str, Optional[str]] = {}
 
-    def declare(self, name: str, tp: Type = object, value: Any = NoValue()) -> None:
+    def declare(self, name: str, tp: Any = Any, value: Any = NoValue(), arg: Optional[str] = None) -> None:
         """Add or modify a param.
 
         Args:
             name: name of the parameter.
-            tp: type (e.g. str, int, list, Union[str, int]...).
-            value (optional): value for the parameter. Default: None.
+            tp: type (e.g. str, int, list, Union[str, int]...). Default: typing.Any
+            value (optional): value for the parameter. Default: NoValue().
+            arg (optional): argument directly related with the value of the parameter. Default: None.
+                            E.g. this is useful to propagate datatypes and values from the target pin to the arg.
 
         """
         if not isinstance(value, NoValue):
             check_type("value", value, tp)
         setattr(self, name, value)
-        if isinstance(type(List), type):
-            self._types[name] = tp
-        else:
-            self._types[name] = tp
+        self._types[name] = tp
+        self._args[name] = arg
+
+    def get_related_arg(self, name: str) -> Optional[str]:
+        """Return the argument related with a given param.
+
+        Args:
+            name: name of the param.
+
+        """
+        return self._args[name]
 
     def get_params(self) -> Collection[str]:
         """Return the name of all the params."""
         return self._types.keys()
 
-    def get_type(self, name: str) -> Type:
+    def get_types(self) -> Dict[str, type]:
+        """Return the name and the type of all the params."""
+        return self._types
+
+    def get_type(self, name: str) -> type:
         """Return the type of a given param.
 
         Args:
@@ -110,8 +124,17 @@ class Component(nn.Module):
     def __init__(self, name: str):
         super().__init__()
         self._name = name
-        self._inputs = Params()
-        self._outputs = Params()
+        (self._inputs, self._outputs) = self.define_params()
+
+    @classmethod
+    def define_params(cls) -> Tuple[Params, Params]:
+        """Define the input and output params without instantiating the class.
+
+        Returns:
+            (input params, output params)
+
+        """
+        return (Params(), Params())
 
     @property
     def name(self) -> str:
