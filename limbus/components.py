@@ -120,7 +120,7 @@ class Select(Component):
 
 class Unbind(Component):
     """Component to unbind one tensor."""
-    value = 2
+    value = 3
 
     def __init__(self, name: str, value: int):
         Unbind.value = value
@@ -146,7 +146,7 @@ class Unbind(Component):
 
 class Stack(Component):
     """Component to stack tensors."""
-    value = 2
+    value = 3
 
     def __init__(self, name: str, value: int):
         Stack.value = value
@@ -163,7 +163,7 @@ class Stack(Component):
         return (inputs, outputs)
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-        tensors: List[torch.Tensor] = [inputs[str(idx)] for idx in range(self._value)]
+        tensors: List[torch.Tensor] = [inputs[str(idx)] for idx in range(Stack.value)]
         self._outputs.set_param("out", torch.stack(tensors))
         return ComponentState.OK
 
