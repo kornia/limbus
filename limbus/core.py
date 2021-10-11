@@ -124,17 +124,28 @@ class Component(nn.Module):
     def __init__(self, name: str):
         super().__init__()
         self._name = name
-        (self._inputs, self._outputs) = self.define_params()
+        self._inputs = self.__class__.register_inputs()
+        self._outputs = self.__class__.register_outputs()
 
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:
-        """Define the input and output params without instantiating the class.
+    @staticmethod
+    def register_inputs() -> Params:
+        """Register the input params.
 
         Returns:
-            (input params, output params)
+            input params
 
         """
-        return (Params(), Params())
+        return Params()
+
+    @staticmethod
+    def register_outputs() -> Params:
+        """Register the output params.
+
+        Returns:
+            output params
+
+        """
+        return Params()
 
     @property
     def name(self) -> str:
