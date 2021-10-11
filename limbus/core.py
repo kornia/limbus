@@ -1,11 +1,12 @@
 """Core methods to manage components."""
 from abc import abstractmethod
-from typing import Dict, Any, List, Collection, Optional, Tuple
+from typing import Callable, Dict, Any, List, Collection, Optional, Tuple, cast
 from typeguard import check_type
 from enum import Enum
 from dataclasses import dataclass
 import logging
 import time
+import inspect
 
 import torch.nn as nn
 
@@ -331,3 +332,73 @@ class ComponentsManager(nn.Module):
                 log.info("DONE")
                 break
             time.sleep(2)
+
+
+def component_factory(callable_to_wrap: Callable) -> Component:
+    """Generate a Component class for a given callable.
+
+    Args:
+        callable_to_wrap: callable to be wrapped as a component.
+
+    Returns:
+        Component wrapping the callable.
+
+    """
+    if not inspect.isfunction(callable_to_wrap) and not inspect.isbuiltin(callable_to_wrap):
+        raise TypeError(f"{callable_to_wrap} is not a function. At this moment only functio callables are supported.")
+
+    # overwrite the forward(), register_inputs() and register_outputs() methods.
+    def forward(self, inputs: Params) -> ComponentState:  # noqa: D417
+        """Run the component.
+
+        Args:
+            inputs: set of values to be used to run the component.
+
+        """
+        args: Dict[str, Any] = {}
+        for param in self._inputs.get_params():
+            args[param] = inputs.get_param(param)
+
+        res = callable_to_wrap(**args)
+
+        if len(self._outputs.get_params()) > 1:
+            for idx, param in enumerate(self._outputs.get_params()):
+                self._outputs.set_param(param, res[idx])
+        else:
+            param = list(self._outputs.get_params())[0]
+            self._outputs.set_param(param, res)
+        return ComponentState.OK
+
+    def register_inputs() -> Params:
+        """Register the inputs params.
+
+        Returns:
+            input params
+
+        """
+        inputs = Params()
+        sign: inspect.Signature = inspect.signature(callable_to_wrap)
+        for param in sign.parameters.values():
+            if param.default is param.empty:
+                inputs.declare(param.name, param.annotation)
+            else:
+                inputs.declare(param.name, param.annotation, param.default)
+        return inputs
+
+    def register_outputs() -> Params:
+        """Register the output params.
+
+        Returns:
+            output params
+
+        """
+        outputs = Params()
+        sign: inspect.Signature = inspect.signature(callable_to_wrap)
+        outputs.declare("out", sign.return_annotation)
+        return outputs
+
+    return cast(Component, type(
+        callable_to_wrap.__name__, (Component,),
+        {"forward": forward, "register_inputs": register_inputs, "register_outputs": register_outputs}
+        )
+    )

@@ -12,9 +12,19 @@ from torch.utils.tensorboard import SummaryWriter
 import visdom
 import kornia
 
-from limbus.core import Component, ComponentState, Params
+from limbus.core import Component, ComponentState, Params, component_factory
 
 log = logging.getLogger(__name__)
+
+
+rgb_to_hls = component_factory(kornia.color.rgb_to_hls)
+hls_to_rgb = component_factory(kornia.color.hls_to_rgb)
+equalize_clahe = component_factory(kornia.enhance.equalize_clahe)
+
+def select(input: torch.Tensor, dim: int, index: int) -> torch.Tensor:  # noqa: D103
+    return torch.select(input, dim, index)
+select = component_factory(select)
+
 
 class ImageReader(Component):
     """Component that holds a constant.
@@ -56,65 +66,6 @@ class ImageReader(Component):
         self._outputs.set_param("name", str(self._value[self._idx].name))
         self._outputs.set_param("counter", f"{self._idx} / {len(self._value)}")
         self._idx += 1
-        return ComponentState.OK
-
-
-class RGB2HLS(Component):
-    """Component to convert a rgb image to hls."""
-    def __init__(self, name: str):
-        super().__init__(name)
-
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
-        inputs = Params()
-        inputs.declare("inp", torch.Tensor)
-        outputs.declare("out", torch.Tensor)
-        return (inputs, outputs)
-
-    def forward(self, inputs) -> ComponentState:  # noqa: D102
-        inp = inputs.get_param("inp")
-        self._outputs.set_param("out", kornia.rgb_to_hls(inp))
-        return ComponentState.OK
-
-
-class HLS2RGB(Component):
-    """Component to convert a hls image to rgb."""
-    def __init__(self, name: str):
-        super().__init__(name)
-
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
-        inputs = Params()
-        inputs.declare("inp", torch.Tensor)
-        outputs.declare("out", torch.Tensor)
-        return (inputs, outputs)
-
-    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-        inp = inputs.get_param("inp")
-        self._outputs.set_param("out", kornia.hls_to_rgb(inp))
-        return ComponentState.OK
-
-
-class Select(Component):
-    """Component to select one channels of an image."""
-    def __init__(self, name: str):
-        super().__init__(name)
-
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
-        inputs = Params()
-        inputs.declare("c", int)
-        inputs.declare("inp", torch.Tensor)
-        outputs.declare("out", torch.Tensor)
-        return (inputs, outputs)
-
-    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-        inp = inputs.get_param("inp")
-        c = inputs.get_param("c")
-        self._outputs.set_param("out", torch.select(inp, -3, c))
         return ComponentState.OK
 
 
@@ -174,30 +125,6 @@ class Stack(Component):
         self._outputs.set_param("out", torch.stack(tensors))
         return ComponentState.OK
 
-
-class Clahe(Component):
-    """Component to apply clahe and output the result."""
-    def __init__(self, name: str):
-        super().__init__(name)
-
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
-        inputs = Params()
-        inputs.declare("inp", kornia.enhance.equalize_clahe.__annotations__["input"])
-        inputs.declare("clip_limit", kornia.enhance.equalize_clahe.__annotations__["clip_limit"], 2.)
-        inputs.declare("grid_size", kornia.enhance.equalize_clahe.__annotations__["grid_size"], (8, 8))
-        outputs.declare("out", torch.Tensor)
-        return (inputs, outputs)
-
-    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-        inp = inputs.get_param("inp")
-        clip_limit = inputs.get_param("clip_limit")
-        grid_size = inputs.get_param("grid_size")
-        self._outputs.set_param("out", (
-            kornia.enhance.equalize_clahe(inp[None], clip_limit, grid_size)).squeeze_(0)
-        )
-        return ComponentState.OK
 
 class ImageShowM(Component):
     """Component to show the input image."""
