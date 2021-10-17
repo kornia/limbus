@@ -1,7 +1,7 @@
 """Core methods to manage components."""
 from abc import abstractmethod
 from typing import Callable, Dict, Any, List, Collection, Optional, Tuple, cast
-from typeguard import check_type
+import typeguard
 from enum import Enum
 from dataclasses import dataclass
 import logging
@@ -9,7 +9,6 @@ import time
 import inspect
 
 import torch.nn as nn
-
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -54,7 +53,7 @@ class Params:
 
         """
         if not isinstance(value, NoValue):
-            check_type("value", value, tp)
+            typeguard.check_type("value", value, tp)
         setattr(self, name, value)
         self._types[name] = tp
         self._args[name] = arg
@@ -92,7 +91,7 @@ class Params:
             name: name of the param.
 
         """
-        check_type(name, getattr(self, name), self.get_type(name))
+        typeguard.check_type(name, getattr(self, name), self.get_type(name))
         return getattr(self, name)
 
     def set_param(self, name: str, value: Any) -> None:
@@ -103,7 +102,7 @@ class Params:
             value: value to be setted.
 
         """
-        check_type(name, value, self.get_type(name))
+        typeguard.check_type(name, value, self.get_type(name))
         setattr(self, name, value)
 
     def __getitem__(self, name: str) -> Any:
@@ -394,7 +393,9 @@ def component_factory(callable_to_wrap: Callable) -> Component:
 
         """
         def isinstance_namedtuple(obj) -> bool:
-            return issubclass(obj, tuple) and hasattr(obj, '_asdict') and hasattr(obj, '_fields')
+            if typeguard.isclass(obj):
+                return issubclass(obj, tuple) and hasattr(obj, '_asdict') and hasattr(obj, '_fields')
+            return False
         outputs = Params()
         sign: inspect.Signature = inspect.signature(callable_to_wrap)
         if isinstance_namedtuple(sign.return_annotation):
@@ -402,8 +403,13 @@ def component_factory(callable_to_wrap: Callable) -> Component:
             for k, v in sign.return_annotation._field_defaults.items():
                 outputs.declare(k, v)
         else:
-            # single output case
-            outputs.declare("out", sign.return_annotation)
+            if not typeguard.isclass(sign.return_annotation) and sign.return_annotation._name == "Tuple":
+                # variable number of outputs
+                for idx, arg in enumerate(sign.return_annotation.__args__):
+                    outputs.declare(f"out{idx}", arg)
+            else:
+                # single output case
+                outputs.declare("out", sign.return_annotation)
         return outputs
 
     return cast(Component, type(

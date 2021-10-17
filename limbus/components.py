@@ -4,6 +4,7 @@ from collections import namedtuple
 from pathlib import Path
 import hashlib
 import logging
+import inspect
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -21,18 +22,19 @@ log = logging.getLogger(__name__)
 class ExtraParams(TypedDict, total=False):
     """Typing for the arguments."""
     params: Dict[str, str]
-    returns: Union[str, Dict[str, str]]
+    returns: Union[str, Dict[str, str], List[str]]
 
 
 ComponentBuilder = Dict[str, ExtraParams]
 
 lst_components: List[ComponentBuilder] = [
+    {"kornia.enhance.image_histogram2d": {"returns": ["out", "out2"]}},  # we already know the types
     {"kornia.color.rgb_to_hls": {}},
     {"kornia.color.hls_to_rgb": {}},
     {"kornia.enhance.equalize_clahe": {}},
     {"torch.select": {
       "params": {"input": "torch.Tensor", "dim": "int", "index": "int"},
-      "returns": {"out": "torch.Tensor"}}
+      "returns": {"out": "torch.Tensor"}}  # we do not know the types
     }
     ]
 
@@ -43,19 +45,32 @@ for cmp in lst_components:
         fn_name = eval(name)
         str_name = name.replace(".", "___")
         params: Optional[Dict[str, str]] = extras.get("params", {})
+        returns: Union[str, Dict[str, str], List[str]] = extras.get("returns", "")
         if not params:
+            if returns:
+                tp: str = f"{str_name}_ret"
+                if isinstance(returns, list):
+                    named_tpl = (f"{tp} = namedtuple('{tp}', returns,"
+                                 f"defaults=inspect.signature({name}).return_annotation.__args__)")
+                else:
+                    named_tpl = f"{tp} = namedtuple('{tp}', returns.keys(), defaults=list(map(eval, returns.values())))"
+                exec(named_tpl)
+                fn_name.__annotations__['return'] = eval(tp)
             callable_function = fn_name
         else:
-            returns: Union[str, Dict[str, str]] = extras.get("returns", "")
             if isinstance(returns, str):
                 func = f"def {str_name}({params}) -> {returns}:\n    return real_func{tuple(params.keys())}\n"
             else:
                 # create namedtuple for the return values. THe default value denotes the type
                 tp: str = f"{str_name}_ret"
-                named_tpl = f"{tp} = namedtuple('{tp}', returns.keys(), defaults=list(map(eval, returns.values())))"
+                if isinstance(returns, list):
+                    named_tpl = (f"{tp} = namedtuple('{tp}', returns,"
+                                 f"defaults=inspect.signature({name}).return_annotation.__args__)")
+                else:
+                    named_tpl = f"{tp} = namedtuple('{tp}', returns.keys(), defaults=list(map(eval, returns.values())))"
                 exec(named_tpl)
-                # create wrapping function for torch methods (they do not have annotated typing)
-                # NOTE: there is a trick to have acces to the name of the parameters. The function signature
+                # create wrapping function (e.g. torch methods do not have annotated typing)
+                # NOTE: there is a trick to have acces to the name of the output parameters. The function signature
                 # requires a namedtuple, however the return of the function is not a namedtuple.
                 # Returning a namedtuple here is complex.
                 str_params = str(params).replace("'","").replace("{","").replace("}","")
