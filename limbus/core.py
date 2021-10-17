@@ -10,6 +10,7 @@ import inspect
 
 import torch.nn as nn
 
+
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
@@ -392,9 +393,17 @@ def component_factory(callable_to_wrap: Callable) -> Component:
             output params
 
         """
+        def isinstance_namedtuple(obj) -> bool:
+            return issubclass(obj, tuple) and hasattr(obj, '_asdict') and hasattr(obj, '_fields')
         outputs = Params()
         sign: inspect.Signature = inspect.signature(callable_to_wrap)
-        outputs.declare("out", sign.return_annotation)
+        if isinstance_namedtuple(sign.return_annotation):
+            # variable number of outputs
+            for k, v in sign.return_annotation._field_defaults.items():
+                outputs.declare(k, v)
+        else:
+            # single output case
+            outputs.declare("out", sign.return_annotation)
         return outputs
 
     return cast(Component, type(

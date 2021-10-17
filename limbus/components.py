@@ -1,5 +1,6 @@
-"""Some predefnied components."""
-from typing import Any, Callable, List, TypeVar, cast, Tuple, Dict, TypedDict, Optional
+"""Some predefined components."""
+from typing import Any, Callable, List, NamedTuple, Union, cast, Tuple, Dict, TypedDict, Optional, Literal
+from collections import namedtuple
 from pathlib import Path
 import hashlib
 import logging
@@ -19,12 +20,11 @@ log = logging.getLogger(__name__)
 
 class ExtraParams(TypedDict, total=False):
     """Typing for the arguments."""
-    params: Optional[Dict[str, type]]
-    returns: Optional[Dict[str, type]]
+    params: Dict[str, str]
+    returns: Union[str, Dict[str, str]]
 
 
 ComponentBuilder = Dict[str, ExtraParams]
-
 
 lst_components: List[ComponentBuilder] = [
     {"kornia.color.rgb_to_hls": {}},
@@ -32,22 +32,36 @@ lst_components: List[ComponentBuilder] = [
     {"kornia.enhance.equalize_clahe": {}},
     {"torch.select": {
       "params": {"input": "torch.Tensor", "dim": "int", "index": "int"},
-      "returns": {"torch.Tensor"}}
+      "returns": {"out": "torch.Tensor"}}
     }
     ]
+
 
 cmp: ComponentBuilder
 for cmp in lst_components:
     for name, extras in cmp.items():
         fn_name = eval(name)
         str_name = name.replace(".", "___")
-        params: Optional[List[Dict[str, type]]] = extras.get("params", None)
+        params: Optional[Dict[str, str]] = extras.get("params", {})
         if not params:
             callable_function = fn_name
         else:
-            returns: Optional[List[Dict[str, type]]] = extras.get("returns", None)
-            func = f"def {str_name}({params}) -> {returns}:\n    return real_func{tuple(params.keys())}\n"
-            func = func.replace("'","").replace("{","").replace("}","")
+            returns: Union[str, Dict[str, str]] = extras.get("returns", "")
+            if isinstance(returns, str):
+                func = f"def {str_name}({params}) -> {returns}:\n    return real_func{tuple(params.keys())}\n"
+            else:
+                # create namedtuple for the return values. THe default value denotes the type
+                tp: str = f"{str_name}_ret"
+                named_tpl = f"{tp} = namedtuple('{tp}', returns.keys(), defaults=list(map(eval, returns.values())))"
+                exec(named_tpl)
+                # create wrapping function for torch methods (they do not have annotated typing)
+                # NOTE: there is a trick to have acces to the name of the parameters. The function signature
+                # requires a namedtuple, however the return of the function is not a namedtuple.
+                # Returning a namedtuple here is complex.
+                str_params = str(params).replace("'","").replace("{","").replace("}","")
+                str_ret_params = str(tuple(params.keys())).replace("'","")
+                func = (f"def {str_name}({str_params}) -> {tp}:\n"
+                        f"    return (real_func{str_ret_params})\n")
             code = compile(func, __file__, "exec")
             eval(code, {"real_func": fn_name}, globals())
             callable_function = globals()[str_name]
