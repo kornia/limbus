@@ -1,5 +1,5 @@
 """Some predefnied components."""
-from typing import Any, List, cast, Tuple
+from typing import Any, Callable, List, TypeVar, cast, Tuple, Dict, TypedDict, Optional
 from pathlib import Path
 import hashlib
 import logging
@@ -17,13 +17,42 @@ from limbus.core import Component, ComponentState, Params, component_factory
 log = logging.getLogger(__name__)
 
 
-rgb_to_hls = component_factory(kornia.color.rgb_to_hls)
-hls_to_rgb = component_factory(kornia.color.hls_to_rgb)
-equalize_clahe = component_factory(kornia.enhance.equalize_clahe)
+class ExtraParams(TypedDict, total=False):
+    """Typing for the arguments."""
+    params: Optional[Dict[str, type]]
+    returns: Optional[Dict[str, type]]
 
-def select(input: torch.Tensor, dim: int, index: int) -> torch.Tensor:  # noqa: D103
-    return torch.select(input, dim, index)
-select = component_factory(select)
+
+ComponentBuilder = Dict[str, ExtraParams]
+
+
+lst_components: List[ComponentBuilder] = [
+    {"kornia.color.rgb_to_hls": {}},
+    {"kornia.color.hls_to_rgb": {}},
+    {"kornia.enhance.equalize_clahe": {}},
+    {"torch.select": {
+      "params": {"input": "torch.Tensor", "dim": "int", "index": "int"},
+      "returns": {"torch.Tensor"}}
+    }
+    ]
+
+cmp: ComponentBuilder
+for cmp in lst_components:
+    for name, extras in cmp.items():
+        fn_name = eval(name)
+        str_name = name.replace(".", "___")
+        params: Optional[List[Dict[str, type]]] = extras.get("params", None)
+        if not params:
+            callable_function = fn_name
+        else:
+            returns: Optional[List[Dict[str, type]]] = extras.get("returns", None)
+            func = f"def {str_name}({params}) -> {returns}:\n    return real_func{tuple(params.keys())}\n"
+            func = func.replace("'","").replace("{","").replace("}","")
+            code = compile(func, __file__, "exec")
+            eval(code, {"real_func": fn_name}, globals())
+            callable_function = globals()[str_name]
+
+        globals()[str_name] = component_factory(callable_function)
 
 
 class ImageReader(Component):
