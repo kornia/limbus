@@ -23,20 +23,37 @@ class ExtraParams(TypedDict, total=False):
     """Typing for the arguments."""
     params: Dict[str, str]
     returns: Union[str, Dict[str, str], List[str]]
-
-
 ComponentBuilder = Dict[str, ExtraParams]
 
+# ways to declare a component:
+# 1.- Params can be obtained with inspect and 1 output:
+#     {"module.function": {}},
+# 2.- Params can be obtained with inspect and several already typed outputs in a tuple:
+#     {"module.function": {"returns": ["output_name_1", "output_name_2"]}},
+# 3.- Params and returns can NOT be obtained with inspect:
+#     {"module.function": {"params": {"input0": "typing0", "input1": "typing1",...},
+#                          "returns": {"output0": "typing0"}}
+# NOTE: second way also accepts typing ans in the third way.
 lst_components: List[ComponentBuilder] = [
     {"kornia.enhance.image_histogram2d": {"returns": ["out", "out2"]}},  # we already know the types
-    {"kornia.color.rgb_to_hls": {}},
+    {"kornia.color.rgb_to_hls": {"returns": "torch.Tensor"}},
     {"kornia.color.hls_to_rgb": {}},
     {"kornia.enhance.equalize_clahe": {}},
+    {"kornia.affine": {}},
     {"torch.select": {
       "params": {"input": "torch.Tensor", "dim": "int", "index": "int"},
       "returns": {"out": "torch.Tensor"}}  # we do not know the types
     }
     ]
+
+# TODO: add type checking when it is possible, validate that the number of input/outputs make sense...
+def _create_ret_namedtuple(returns: Union[Dict[str, str], List[str]], tp: str, name: str) -> None:
+    if isinstance(returns, list):
+        named_tpl = (f"namedtuple('{tp}', returns,"
+                     f"defaults=inspect.signature({name}).return_annotation.__args__)")
+    else:
+        named_tpl = f"namedtuple('{tp}', returns.keys(), defaults=list(map(eval, returns.values())))"
+    globals()[tp] = eval(named_tpl)
 
 
 cmp: ComponentBuilder
@@ -46,29 +63,22 @@ for cmp in lst_components:
         str_name = name.replace(".", "___")
         params: Optional[Dict[str, str]] = extras.get("params", {})
         returns: Union[str, Dict[str, str], List[str]] = extras.get("returns", "")
+        tp: str = f"{str_name}_ret"
         if not params:
             if returns:
-                tp: str = f"{str_name}_ret"
-                if isinstance(returns, list):
-                    named_tpl = (f"{tp} = namedtuple('{tp}', returns,"
-                                 f"defaults=inspect.signature({name}).return_annotation.__args__)")
+                # NOTE: we are overriding the type of the return!!!
+                if not isinstance(returns, str):
+                    _create_ret_namedtuple(returns, tp, name)
+                    fn_name.__annotations__["return"] = eval(tp)
                 else:
-                    named_tpl = f"{tp} = namedtuple('{tp}', returns.keys(), defaults=list(map(eval, returns.values())))"
-                exec(named_tpl)
-                fn_name.__annotations__['return'] = eval(tp)
+                    fn_name.__annotations__["return"] = eval(returns)
             callable_function = fn_name
         else:
             if isinstance(returns, str):
                 func = f"def {str_name}({params}) -> {returns}:\n    return real_func{tuple(params.keys())}\n"
             else:
                 # create namedtuple for the return values. THe default value denotes the type
-                tp: str = f"{str_name}_ret"
-                if isinstance(returns, list):
-                    named_tpl = (f"{tp} = namedtuple('{tp}', returns,"
-                                 f"defaults=inspect.signature({name}).return_annotation.__args__)")
-                else:
-                    named_tpl = f"{tp} = namedtuple('{tp}', returns.keys(), defaults=list(map(eval, returns.values())))"
-                exec(named_tpl)
+                _create_ret_namedtuple(returns, tp, name)
                 # create wrapping function (e.g. torch methods do not have annotated typing)
                 # NOTE: there is a trick to have acces to the name of the output parameters. The function signature
                 # requires a namedtuple, however the return of the function is not a namedtuple.
