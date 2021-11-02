@@ -1,8 +1,10 @@
-"""Some predefnied components."""
-from typing import Any, List, cast, Tuple
+"""Some predefined components."""
+from typing import Any, Callable, List, NamedTuple, Union, cast, Tuple, Dict, TypedDict, Optional, Literal
+from collections import namedtuple
 from pathlib import Path
 import hashlib
 import logging
+import inspect
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -12,9 +14,85 @@ from torch.utils.tensorboard import SummaryWriter
 import visdom
 import kornia
 
-from limbus.core import Component, ComponentState, Params
+from limbus.core import Component, ComponentState, Params, component_factory
 
 log = logging.getLogger(__name__)
+
+
+class ExtraParams(TypedDict, total=False):
+    """Typing for the arguments."""
+    params: Dict[str, str]
+    returns: Union[str, Dict[str, str], List[str]]
+ComponentBuilder = Dict[str, ExtraParams]
+
+# ways to declare a component:
+# 1.- Params can be obtained with inspect and 1 output:
+#     {"module.function": {}},
+# 2.- Params can be obtained with inspect and several already typed outputs in a tuple:
+#     {"module.function": {"returns": ["output_name_1", "output_name_2"]}},
+# 3.- Params and returns can NOT be obtained with inspect:
+#     {"module.function": {"params": {"input0": "typing0", "input1": "typing1",...},
+#                          "returns": {"output0": "typing0"}}
+# NOTE: second way also accepts typing ans in the third way.
+lst_components: List[ComponentBuilder] = [
+    {"kornia.enhance.image_histogram2d": {"returns": ["out", "out2"]}},  # we already know the types
+    {"kornia.color.rgb_to_hls": {"returns": "torch.Tensor"}},
+    {"kornia.color.hls_to_rgb": {}},
+    {"kornia.enhance.equalize_clahe": {}},
+    {"kornia.affine": {}},
+    {"torch.select": {
+      "params": {"input": "torch.Tensor", "dim": "int", "index": "int"},
+      "returns": {"out": "torch.Tensor"}}  # we do not know the types
+    }
+    ]
+
+# TODO: add type checking when it is possible, validate that the number of input/outputs make sense...
+def _create_ret_namedtuple(returns: Union[Dict[str, str], List[str]], tp: str, name: str) -> None:
+    if isinstance(returns, list):
+        named_tpl = (f"namedtuple('{tp}', returns,"
+                     f"defaults=inspect.signature({name}).return_annotation.__args__)")
+    else:
+        named_tpl = f"namedtuple('{tp}', returns.keys(), defaults=list(map(eval, returns.values())))"
+    globals()[tp] = eval(named_tpl)
+
+
+cmp: ComponentBuilder
+for cmp in lst_components:
+    for name, extras in cmp.items():
+        fn_name = eval(name)
+        str_name = name.replace(".", "___")
+        params: Optional[Dict[str, str]] = extras.get("params", {})
+        returns: Union[str, Dict[str, str], List[str]] = extras.get("returns", "")
+        tp: str = f"{str_name}_ret"
+        if not params:
+            if returns:
+                # NOTE: we are overriding the type of the return!!!
+                if not isinstance(returns, str):
+                    _create_ret_namedtuple(returns, tp, name)
+                    fn_name.__annotations__["return"] = eval(tp)
+                else:
+                    fn_name.__annotations__["return"] = eval(returns)
+            callable_function = fn_name
+        else:
+            if isinstance(returns, str):
+                func = f"def {str_name}({params}) -> {returns}:\n    return real_func{tuple(params.keys())}\n"
+            else:
+                # create namedtuple for the return values. THe default value denotes the type
+                _create_ret_namedtuple(returns, tp, name)
+                # create wrapping function (e.g. torch methods do not have annotated typing)
+                # NOTE: there is a trick to have acces to the name of the output parameters. The function signature
+                # requires a namedtuple, however the return of the function is not a namedtuple.
+                # Returning a namedtuple here is complex.
+                str_params = str(params).replace("'","").replace("{","").replace("}","")
+                str_ret_params = str(tuple(params.keys())).replace("'","")
+                func = (f"def {str_name}({str_params}) -> {tp}:\n"
+                        f"    return (real_func{str_ret_params})\n")
+            code = compile(func, __file__, "exec")
+            eval(code, {"real_func": fn_name}, globals())
+            callable_function = globals()[str_name]
+
+        globals()[str_name] = component_factory(callable_function)
+
 
 class ImageReader(Component):
     """Component that holds a constant.
@@ -33,13 +111,13 @@ class ImageReader(Component):
         else:
             self._value.append(Path(path))
 
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+    @staticmethod
+    def register_outputs() -> Params:  # noqa: D102
         outputs = Params()
         outputs.declare("image", torch.Tensor)
         outputs.declare("name", str)
         outputs.declare("counter", str)
-        return (Params(), outputs)
+        return outputs
         
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         while True:
@@ -59,65 +137,6 @@ class ImageReader(Component):
         return ComponentState.OK
 
 
-class RGB2HLS(Component):
-    """Component to convert a rgb image to hls."""
-    def __init__(self, name: str):
-        super().__init__(name)
-
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
-        inputs = Params()
-        inputs.declare("inp", torch.Tensor)
-        outputs.declare("out", torch.Tensor)
-        return (inputs, outputs)
-
-    def forward(self, inputs) -> ComponentState:  # noqa: D102
-        inp = inputs.get_param("inp")
-        self._outputs.set_param("out", kornia.rgb_to_hls(inp))
-        return ComponentState.OK
-
-
-class HLS2RGB(Component):
-    """Component to convert a hls image to rgb."""
-    def __init__(self, name: str):
-        super().__init__(name)
-
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
-        inputs = Params()
-        inputs.declare("inp", torch.Tensor)
-        outputs.declare("out", torch.Tensor)
-        return (inputs, outputs)
-
-    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-        inp = inputs.get_param("inp")
-        self._outputs.set_param("out", kornia.hls_to_rgb(inp))
-        return ComponentState.OK
-
-
-class Select(Component):
-    """Component to select one channels of an image."""
-    def __init__(self, name: str):
-        super().__init__(name)
-
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
-        inputs = Params()
-        inputs.declare("c", int)
-        inputs.declare("inp", torch.Tensor)
-        outputs.declare("out", torch.Tensor)
-        return (inputs, outputs)
-
-    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-        inp = inputs.get_param("inp")
-        c = inputs.get_param("c")
-        self._outputs.set_param("out", torch.select(inp, -3, c))
-        return ComponentState.OK
-
-
 class Unbind(Component):
     """Component to unbind one tensor."""
     value = 3
@@ -126,14 +145,18 @@ class Unbind(Component):
         Unbind.value = value
         super().__init__(name)
 
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
         inputs = Params()
         inputs.declare("inp", torch.Tensor)
+        return inputs
+
+    @staticmethod
+    def register_outputs() -> Params:  # noqa: D102
+        outputs = Params()
         for v in range(Unbind.value):
             outputs.declare(str(v), torch.Tensor)
-        return (inputs, outputs)
+        return outputs
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         inp = inputs.get_param("inp")
@@ -152,57 +175,35 @@ class Stack(Component):
         Stack.value = value
         super().__init__(name)
 
-
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
         inputs = Params()
         for v in range(Stack.value):
             inputs.declare(str(v), torch.Tensor)
+        return inputs
+    
+    @staticmethod
+    def register_outputs() -> Params:  # noqa: D102
+        outputs = Params()
         outputs.declare("out", torch.Tensor)
-        return (inputs, outputs)
-
+        return outputs
+    
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         tensors: List[torch.Tensor] = [inputs[str(idx)] for idx in range(Stack.value)]
         self._outputs.set_param("out", torch.stack(tensors))
         return ComponentState.OK
 
 
-class Clahe(Component):
-    """Component to apply clahe and output the result."""
-    def __init__(self, name: str):
-        super().__init__(name)
-
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
-        inputs = Params()
-        inputs.declare("inp", kornia.enhance.equalize_clahe.__annotations__["input"])
-        inputs.declare("clip_limit", kornia.enhance.equalize_clahe.__annotations__["clip_limit"], 2.)
-        inputs.declare("grid_size", kornia.enhance.equalize_clahe.__annotations__["grid_size"], (8, 8))
-        outputs.declare("out", torch.Tensor)
-        return (inputs, outputs)
-
-    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-        inp = inputs.get_param("inp")
-        clip_limit = inputs.get_param("clip_limit")
-        grid_size = inputs.get_param("grid_size")
-        self._outputs.set_param("out", (
-            kornia.enhance.equalize_clahe(inp[None], clip_limit, grid_size)).squeeze_(0)
-        )
-        return ComponentState.OK
-
 class ImageShowM(Component):
     """Component to show the input image."""
     def __init__(self, name: str):
         super().__init__(name)
 
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
         inputs = Params()
         inputs.declare("image", torch.Tensor)
-        return (inputs, outputs)
+        return inputs
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         image = inputs.get_param("image")
@@ -226,12 +227,11 @@ class ImageShowTensorboard(Component):
         super().__init__(name)
         self._writer = SummaryWriter('tensorboard')
 
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
         inputs = Params()
         inputs.declare("image", torch.Tensor)
-        return (inputs, outputs)
+        return inputs
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         image = inputs.get_param("image")
@@ -262,12 +262,11 @@ class ImageShow(Component):
         if not self._visdom.check_connection():
             raise ConnectionError('Error connecting with the visdom server.')
 
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
         inputs = Params()
         inputs.declare("image", torch.Tensor)
-        return (inputs, outputs)
+        return inputs
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         opts = {'title': self.name}
@@ -289,12 +288,11 @@ class Constant(Component):
         super().__init__(name)
         self._value = value
 
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
+    @staticmethod
+    def register_outputs() -> Params:  # noqa: D102
         outputs = Params()
-        inputs = Params()
         outputs.declare("out", Any, arg="value")
-        return (inputs, outputs)
+        return outputs
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         # TODO: next line could be autogenerated fron the declare() method since there we are already linking both.
@@ -307,12 +305,11 @@ class Printer(Component):
     def __init__(self, name: str):
         super().__init__(name)
 
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
         inputs = Params()
         inputs.declare("inp", Any)
-        return (inputs, outputs)
+        return inputs
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         inp = inputs.get_param("inp")
@@ -325,14 +322,18 @@ class Adder(Component):
     def __init__(self, name: str):
         super().__init__(name)
 
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
         inputs = Params()
         inputs.declare("a", torch.Tensor)
         inputs.declare("b", torch.Tensor)
+        return inputs
+
+    @staticmethod
+    def register_outputs() -> Params:  # noqa: D102
+        outputs = Params()
         outputs.declare("out", torch.Tensor)
-        return (inputs, outputs)
+        return outputs
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         a = inputs.get_param("a")
@@ -346,14 +347,18 @@ class Multiplier(Component):
     def __init__(self, name: str):
         super().__init__(name)
 
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:  # noqa: D102
-        outputs = Params()
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
         inputs = Params()
         inputs.declare("a", torch.Tensor)
         inputs.declare("b", torch.Tensor)
+        return inputs
+
+    @staticmethod
+    def register_outputs() -> Params:  # noqa: D102
+        outputs = Params()
         outputs.declare("out", torch.Tensor)
-        return (inputs, outputs)
+        return outputs
 
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         a = inputs.get_param("a")

@@ -1,11 +1,12 @@
 """Core methods to manage components."""
 from abc import abstractmethod
-from typing import Dict, Any, List, Collection, Optional, Tuple
-from typeguard import check_type
+from typing import Callable, Dict, Any, List, Collection, Optional, Tuple, cast
+import typeguard
 from enum import Enum
 from dataclasses import dataclass
 import logging
 import time
+import inspect
 
 import torch.nn as nn
 
@@ -52,7 +53,7 @@ class Params:
 
         """
         if not isinstance(value, NoValue):
-            check_type("value", value, tp)
+            typeguard.check_type("value", value, tp)
         setattr(self, name, value)
         self._types[name] = tp
         self._args[name] = arg
@@ -90,7 +91,7 @@ class Params:
             name: name of the param.
 
         """
-        check_type(name, getattr(self, name), self.get_type(name))
+        typeguard.check_type(name, getattr(self, name), self.get_type(name))
         return getattr(self, name)
 
     def set_param(self, name: str, value: Any) -> None:
@@ -101,7 +102,7 @@ class Params:
             value: value to be setted.
 
         """
-        check_type(name, value, self.get_type(name))
+        typeguard.check_type(name, value, self.get_type(name))
         setattr(self, name, value)
 
     def __getitem__(self, name: str) -> Any:
@@ -124,17 +125,28 @@ class Component(nn.Module):
     def __init__(self, name: str):
         super().__init__()
         self._name = name
-        (self._inputs, self._outputs) = self.define_params()
+        self._inputs = self.__class__.register_inputs()
+        self._outputs = self.__class__.register_outputs()
 
-    @classmethod
-    def define_params(cls) -> Tuple[Params, Params]:
-        """Define the input and output params without instantiating the class.
+    @staticmethod
+    def register_inputs() -> Params:
+        """Register the input params.
 
         Returns:
-            (input params, output params)
+            input params
 
         """
-        return (Params(), Params())
+        return Params()
+
+    @staticmethod
+    def register_outputs() -> Params:
+        """Register the output params.
+
+        Returns:
+            output params
+
+        """
+        return Params()
 
     @property
     def name(self) -> str:
@@ -320,3 +332,88 @@ class ComponentsManager(nn.Module):
                 log.info("DONE")
                 break
             time.sleep(2)
+
+
+def component_factory(callable_to_wrap: Callable) -> Component:
+    """Generate a Component class for a given callable.
+
+    Args:
+        callable_to_wrap: callable to be wrapped as a component.
+
+    Returns:
+        Component wrapping the callable.
+
+    """
+    if not inspect.isfunction(callable_to_wrap) and not inspect.isbuiltin(callable_to_wrap):
+        raise TypeError(f"{callable_to_wrap} is not a function. At this moment only functio callables are supported.")
+
+    # overwrite the forward(), register_inputs() and register_outputs() methods.
+    def forward(self, inputs: Params) -> ComponentState:  # noqa: D417
+        """Run the component.
+
+        Args:
+            inputs: set of values to be used to run the component.
+
+        """
+        args: Dict[str, Any] = {}
+        for param in self._inputs.get_params():
+            args[param] = inputs.get_param(param)
+
+        res = callable_to_wrap(**args)
+
+        if len(self._outputs.get_params()) > 1:
+            for idx, param in enumerate(self._outputs.get_params()):
+                self._outputs.set_param(param, res[idx])
+        else:
+            param = list(self._outputs.get_params())[0]
+            self._outputs.set_param(param, res)
+        return ComponentState.OK
+
+    def register_inputs() -> Params:
+        """Register the inputs params.
+
+        Returns:
+            input params
+
+        """
+        inputs = Params()
+        sign: inspect.Signature = inspect.signature(callable_to_wrap)
+        for param in sign.parameters.values():
+            if param.default is param.empty:
+                inputs.declare(param.name, param.annotation)
+            else:
+                inputs.declare(param.name, param.annotation, param.default)
+        return inputs
+
+    def register_outputs() -> Params:
+        """Register the output params.
+
+        Returns:
+            output params
+
+        """
+        def isinstance_namedtuple(obj) -> bool:
+            if typeguard.isclass(obj):
+                return issubclass(obj, tuple) and hasattr(obj, '_asdict') and hasattr(obj, '_fields')
+            return False
+        outputs = Params()
+        sign: inspect.Signature = inspect.signature(callable_to_wrap)
+        if isinstance_namedtuple(sign.return_annotation):
+            # variable number of outputs
+            for k, v in sign.return_annotation._field_defaults.items():
+                outputs.declare(k, v)
+        else:
+            if not typeguard.isclass(sign.return_annotation) and sign.return_annotation._name == "Tuple":
+                # variable number of outputs
+                for idx, arg in enumerate(sign.return_annotation.__args__):
+                    outputs.declare(f"out{idx}", arg)
+            else:
+                # single output case
+                outputs.declare("out", sign.return_annotation)
+        return outputs
+
+    return cast(Component, type(
+        callable_to_wrap.__name__, (Component,),
+        {"forward": forward, "register_inputs": register_inputs, "register_outputs": register_outputs}
+        )
+    )
