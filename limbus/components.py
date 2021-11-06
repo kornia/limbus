@@ -194,56 +194,56 @@ class Stack(Component):
         return ComponentState.OK
 
 
-class ImageShowM(Component):
-    """Component to show the input image."""
-    def __init__(self, name: str):
-        super().__init__(name)
-
-    @staticmethod
-    def register_inputs() -> Params:  # noqa: D102
-        inputs = Params()
-        inputs.declare("image", torch.Tensor)
-        return inputs
-
-    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-        image = inputs.get_param("image")
-        if image.dim() == 2:
-            image = image[None].repeat(3, 1, 1)
-        img: np.ndarray = kornia.tensor_to_image(
-            image.mul(255).clamp(0, 255).int())
-        fig = plt.figure(int(hashlib.md5(self._name.encode()).hexdigest(), 16))
-        fig.canvas.set_window_title(self._name)
-        fig.add_subplot(111).imshow(img)
-        plt.show(block=False)
-        return ComponentState.OK
-
-    def finish_iter(self) -> None:  # noqa: D102
-        plt.show()
-
-
-class ImageShowTensorboard(Component):
-    """Component to show the input image."""
-    def __init__(self, name: str):
-        super().__init__(name)
-        self._writer = SummaryWriter('tensorboard')
-
-    @staticmethod
-    def register_inputs() -> Params:  # noqa: D102
-        inputs = Params()
-        inputs.declare("image", torch.Tensor)
-        return inputs
-
-    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-        image = inputs.get_param("image")
-        self._writer.add_image(self.name, image)
-        return ComponentState.OK
-
-    def finish_iter(self) -> None:  # noqa: D102
-        self._writer.flush()
-
-    def __del__(self):
-        self._writer.close()
-
+# class ImageShowM(Component):
+#     """Component to show the input image."""
+#     def __init__(self, name: str):
+#         super().__init__(name)
+# 
+#     @staticmethod
+#     def register_inputs() -> Params:  # noqa: D102
+#         inputs = Params()
+#         inputs.declare("image", torch.Tensor)
+#         return inputs
+# 
+#     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
+#         image = inputs.get_param("image")
+#         if image.dim() == 2:
+#             image = image[None].repeat(3, 1, 1)
+#         img: np.ndarray = kornia.tensor_to_image(
+#             image.mul(255).clamp(0, 255).int())
+#         fig = plt.figure(int(hashlib.md5(self._name.encode()).hexdigest(), 16))
+#         fig.canvas.set_window_title(self._name)
+#         fig.add_subplot(111).imshow(img)
+#         plt.show(block=False)
+#         return ComponentState.OK
+# 
+#     def finish_iter(self) -> None:  # noqa: D102
+#         plt.show()
+#
+#
+# class ImageShowTensorboard(Component):
+#     """Component to show the input image."""
+#     def __init__(self, name: str):
+#         super().__init__(name)
+#         self._writer = SummaryWriter('tensorboard')
+# 
+#     @staticmethod
+#     def register_inputs() -> Params:  # noqa: D102
+#         inputs = Params()
+#         inputs.declare("image", torch.Tensor)
+#         return inputs
+# 
+#     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
+#         image = inputs.get_param("image")
+#         self._writer.add_image(self.name, image)
+#         return ComponentState.OK
+# 
+#     def finish_iter(self) -> None:  # noqa: D102
+#         self._writer.flush()
+# 
+#     def __del__(self):
+#         self._writer.close()
+# 
 
 class ImageShow(Component):
     """Component to show the input image."""
@@ -317,51 +317,51 @@ class Printer(Component):
         return ComponentState.OK
 
 
-class Adder(Component):
-    """Component to add two inputs and output the result."""
-    def __init__(self, name: str):
-        super().__init__(name)
-
-    @staticmethod
-    def register_inputs() -> Params:  # noqa: D102
-        inputs = Params()
-        inputs.declare("a", torch.Tensor)
-        inputs.declare("b", torch.Tensor)
-        return inputs
-
-    @staticmethod
-    def register_outputs() -> Params:  # noqa: D102
-        outputs = Params()
-        outputs.declare("out", torch.Tensor)
-        return outputs
-
-    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-        a = inputs.get_param("a")
-        b = inputs.get_param("b")
-        self._outputs.set_param("out", a + b)
-        return ComponentState.OK
-
-
-class Multiplier(Component):
-    """Component to multiply two inputs and output the result."""
-    def __init__(self, name: str):
-        super().__init__(name)
-
-    @staticmethod
-    def register_inputs() -> Params:  # noqa: D102
-        inputs = Params()
-        inputs.declare("a", torch.Tensor)
-        inputs.declare("b", torch.Tensor)
-        return inputs
-
-    @staticmethod
-    def register_outputs() -> Params:  # noqa: D102
-        outputs = Params()
-        outputs.declare("out", torch.Tensor)
-        return outputs
-
-    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-        a = inputs.get_param("a")
-        b = inputs.get_param("b")
-        self._outputs.set_param("out", a * b)
-        return ComponentState.OK
+# class Adder(Component):
+#     """Component to add two inputs and output the result."""
+#     def __init__(self, name: str):
+#         super().__init__(name)
+# 
+#     @staticmethod
+#     def register_inputs() -> Params:  # noqa: D102
+#         inputs = Params()
+#         inputs.declare("a", torch.Tensor)
+#         inputs.declare("b", torch.Tensor)
+#         return inputs
+# 
+#     @staticmethod
+#     def register_outputs() -> Params:  # noqa: D102
+#         outputs = Params()
+#         outputs.declare("out", torch.Tensor)
+#         return outputs
+# 
+#     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
+#         a = inputs.get_param("a")
+#         b = inputs.get_param("b")
+#         self._outputs.set_param("out", a + b)
+#         return ComponentState.OK
+#
+#
+# class Multiplier(Component):
+#     """Component to multiply two inputs and output the result."""
+#     def __init__(self, name: str):
+#         super().__init__(name)
+# 
+#     @staticmethod
+#     def register_inputs() -> Params:  # noqa: D102
+#         inputs = Params()
+#         inputs.declare("a", torch.Tensor)
+#         inputs.declare("b", torch.Tensor)
+#         return inputs
+# 
+#     @staticmethod
+#     def register_outputs() -> Params:  # noqa: D102
+#         outputs = Params()
+#         outputs.declare("out", torch.Tensor)
+#         return outputs
+# 
+#     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
+#         a = inputs.get_param("a")
+#         b = inputs.get_param("b")
+#         self._outputs.set_param("out", a * b)
+#         return ComponentState.OK
