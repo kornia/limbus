@@ -47,14 +47,14 @@ lst_components: List[ComponentBuilder] = [
     ]
 
 # TODO: add type checking when it is possible, validate that the number of input/outputs make sense...
-def _create_ret_namedtuple(returns: Union[Dict[str, str], List[str]], tp: str, name: str) -> None:
+def _create_ret_namedtuple(returns: Union[Dict[str, str], List[str]], tp: str, name: str) -> str:
     if isinstance(returns, list):
         named_tpl = (f"namedtuple('{tp}', returns,"
                      f"defaults=inspect.signature({name}).return_annotation.__args__)")
     else:
         named_tpl = f"namedtuple('{tp}', returns.keys(), defaults=list(map(eval, returns.values())))"
     globals()[tp] = eval(named_tpl)
-
+    return tp
 
 cmp: ComponentBuilder
 for cmp in lst_components:
@@ -68,25 +68,20 @@ for cmp in lst_components:
             if returns:
                 # NOTE: we are overriding the type of the return!!!
                 if not isinstance(returns, str):
-                    _create_ret_namedtuple(returns, tp, name)
-                    fn_name.__annotations__["return"] = eval(tp)
-                else:
-                    fn_name.__annotations__["return"] = eval(returns)
+                    returns = _create_ret_namedtuple(returns, tp, name)
+                fn_name.__annotations__["return"] = eval(returns)
             callable_function = fn_name
         else:
-            if isinstance(returns, str):
-                func = f"def {str_name}({params}) -> {returns}:\n    return real_func{tuple(params.keys())}\n"
-            else:
+            if not isinstance(returns, str):
                 # create namedtuple for the return values. THe default value denotes the type
-                _create_ret_namedtuple(returns, tp, name)
-                # create wrapping function (e.g. torch methods do not have annotated typing)
-                # NOTE: there is a trick to have acces to the name of the output parameters. The function signature
-                # requires a namedtuple, however the return of the function is not a namedtuple.
-                # Returning a namedtuple here is complex.
-                str_params = str(params).replace("'","").replace("{","").replace("}","")
-                str_ret_params = str(tuple(params.keys())).replace("'","")
-                func = (f"def {str_name}({str_params}) -> {tp}:\n"
-                        f"    return (real_func{str_ret_params})\n")
+                returns = _create_ret_namedtuple(returns, tp, name)
+            # create wrapping function (e.g. torch methods do not have annotated typing)
+            # NOTE: there is a trick to have acces to the name of the output parameters. The function signature
+            # requires a namedtuple, however the return of the function is not a namedtuple.
+            # Returning a namedtuple here is complex.
+            str_params = str(params).replace("'","").replace("{","").replace("}","")
+            str_ret_params = str(tuple(params.keys())).replace("'","")
+            func = f"def {str_name}({str_params}) -> {returns}:\n    return real_func{str_ret_params}\n"
             code = compile(func, __file__, "exec")
             eval(code, {"real_func": fn_name}, globals())
             callable_function = globals()[str_name]
