@@ -1,12 +1,14 @@
 """Core methods to manage components."""
 from abc import abstractmethod
-from typing import Callable, Dict, Any, List, Collection, Optional, Tuple, cast
+from typing import Callable, Dict, Any, List, Collection, Optional, Tuple, cast, Union, OrderedDict
+import torch
 import typeguard
 from enum import Enum
 from dataclasses import dataclass
 import logging
 import time
 import inspect
+import collections
 
 import torch.nn as nn
 
@@ -183,14 +185,16 @@ class Component(nn.Module):
 class _Link:
     node: str
     pin: str
+    idx: Optional[int] = None  # index of the pin data being used. E.g. tensor[:, idx, :, :]
 
 
 @dataclass
 class _Node:
     type: NodeType
     component: Component
-    inputs: Dict[Any, List[_Link]]
-    outputs: Dict[Any, List[_Link]]
+    # inputs and outputs are lists of _Link but we could need to access them through an index
+    inputs: Dict[Any, List[Union[Dict[int, _Link], _Link]]]
+    outputs: Dict[Any, List[Union[Dict[int, _Link], _Link]]]
 
 
 class DefaultParam():
@@ -207,16 +211,24 @@ class ComponentsManager(nn.Module):
         self.nodes: Dict[str, _Node] = {}
         self._seq = []
 
-    def connect(self, _from: Component, _from_name: str, _to: Component, _to_name: str) -> None:
+    def connect(self,
+                _from: Component, from_name: Union[str, Tuple[str, int]],
+                _to: Component, to_name: Union[str, Tuple[str, int]]) -> None:
         """Connect one component output to another component input.
 
         Args:
             _from: the origin component instance.
-            _from_name: the origin component member name.
+            from_name: the origin component member name. Can be a tuple (name, index) where index denotes the internal
+                        element to be connected.
             _to: the destination component instance.
-            _to_name: the destination component member name.
+            _to_name: the destination component member name. Can be a tuple (name, index) where index denotes the
+                        internal element to be connected.
 
         """
+        from_idx: Optional[int] = from_name[1] if isinstance(from_name, tuple) else None
+        from_name = from_name if isinstance(from_name, str) else from_name[0]
+        to_idx: Optional[int] = to_name[1] if isinstance(to_name, tuple) else None
+        to_name = to_name if isinstance(to_name, str) else to_name[0]
         for comp in [_from, _to]:
             if comp.name not in self.nodes.keys():
                 # check type of component and list all the input and output pins
@@ -237,23 +249,40 @@ class ComponentsManager(nn.Module):
                 self.nodes[comp.name] = _Node(node_type, comp, inp, out)
 
         # set connections between nodes (they can be multiple)
-        self.nodes[_from.name].outputs[_from_name].append(_Link(_to.name, _to_name))
-        self.nodes[_to.name].inputs[_to_name].append(_Link(_from.name, _from_name))
+        to_link: Union[Dict[int, _Link], _Link] = _Link(_to.name, to_name, to_idx)
+        from_link: Union[Dict[int, _Link], _Link] = _Link(_from.name, from_name, from_idx)
+        if from_idx is not None:
+            assert isinstance(to_link, _Link)
+            to_link = {from_idx: to_link}
+        if to_idx is not None:
+            assert isinstance(from_link, _Link)
+            from_link = {to_idx: from_link}
+        self.nodes[_from.name].outputs[from_name].append(to_link)
+        self.nodes[_to.name].inputs[to_name].append(from_link)
 
     def _traverse(self, node_name) -> None:
-        out_pins: Dict[Any, List[_Link]] = self.nodes[node_name].outputs
-        inp_links: List[_Link]
-        link: _Link
+        # remainder about teh pins:
+        # - they can be entirely assigned to another pin (then the type is _Link)
+        # - they can be assigned by slices (then the type is Dict[int, _Link])
+        out_pins: Dict[Any, List[Union[Dict[int, _Link], _Link]]] = self.nodes[node_name].outputs
+        inp_links: List[Union[Dict[int, _Link], _Link]]
+        link: Union[Dict[int, _Link], _Link]
         for inp_links in out_pins.values():
             # each output pin can be linked to several input pins
             for link in inp_links:
+                if isinstance(link, dict):
+                    # in the traverse we do not care about the indexes
+                    link = list(link.values())[0]
                 next_inp_link: bool = False
                 dst_node: _Node = self.nodes[link.node]
                 # check if all the components required by the input pins are added
-                dst_inp_pin: List[_Link]
+                dst_inp_pin: List[Union[Dict[int, _Link], _Link]]
                 for _, dst_inp_pin in dst_node.inputs.items():
                     # check that all the connected nodes for that link are added
                     for out_src_link in dst_inp_pin:
+                        if isinstance(out_src_link, dict):
+                            # in the traverse we do not care about the indexes
+                            out_src_link = list(out_src_link.values())[0]
                         # if not all the source nodes are already in teh seq, we need to add them before
                         if out_src_link.node not in self._seq:
                             # jump to the next link in the list
@@ -298,22 +327,63 @@ class ComponentsManager(nn.Module):
             for node_name in self._seq:
                 obj = self.nodes[node_name].component
                 pin: str
-                links: List[_Link]
+                links: List[Union[Dict[int, _Link], _Link]]
                 # get values from the connected components
                 inputs = Params()
                 for pin, links in self.nodes[node_name].inputs.items():
                     # get input value for each pin
-                    values = []  # for now we assume that params are passed as a list
+                    # each pin can have one value except in case of slices
+                    values: Union[OrderedDict[int, Any], Any] = collections.OrderedDict()
                     for link in links:
+                        if len(links) > 1:
+                            # if we have more than one link per pin they must be slices
+                            try:
+                                typeguard.check_type("",link, Dict[int, _Link])
+                            except:
+                                raise ValueError(f"There are several links connected to the input pin '{pin}' in "
+                                                 f"'{obj.__repr__()}'. Input pins do not accept multiple assignements.")
+
+                        idx: Optional[int] = None
+                        try:
+                            # trick to use typeguard to check the type. If it is a dict then idx and link are updated
+                            typeguard.check_type("", link, Dict[int, _Link])
+                            assert isinstance(link, dict)
+                            idx = list(link.keys())[0]
+                            link = list(link.values())[0]
+                        except TypeError:
+                            pass
+
+                        assert isinstance(link, _Link)
                         value = self.nodes[link.node].component.outputs[link.pin]
-                        if isinstance(value, DefaultParam):
-                            values.append(obj.inputs[pin])
+                        if link.idx is not None:
+                            # select the correct value from the list
+                            value = value[link.idx]
+
+                        if idx is not None:
+                            if idx in values:
+                                raise ValueError(f"There are several links connected to the input pin '{pin}' in "
+                                                 f"'{obj.__repr__()}'. Input pins do not accept multiple assignements.")
+                            values[idx] = value
                         else:
-                            values.append(value)
-                    if len(links) == 1:
-                        inputs.declare(pin, obj.inputs.get_type(pin), values[0])
-                    else:
+                            # if it is not a slice we can assign the value directly
+                            if isinstance(value, DefaultParam):
+                                # without slicing we accept default values
+                                values = obj.inputs[pin].default
+                            else:
+                                values = value
+                            break
+
+                    if not isinstance(values, OrderedDict):
                         inputs.declare(pin, obj.inputs.get_type(pin), values)
+                    else:
+                        # create list with values sorted according to the idx
+                        # NOTE the idx do not need to be consecutive!!!!
+                        # NOTE new_values type should be Sequence[torch.Tensor]
+                        new_values = []
+                        for k in sorted(values.keys()):
+                            # assert isinstance(values[k], torch.Tensor)
+                            new_values.append(values[k])
+                        inputs.declare(pin, obj.inputs.get_type(pin), new_values)
                 state = obj.forward(inputs)
 
                 if state == ComponentState.STOPPED:
