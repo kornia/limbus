@@ -39,7 +39,6 @@ lst_components: List[ComponentBuilder] = [
     {"kornia.color.rgb_to_hls": {"returns": "torch.Tensor"}},
     {"kornia.color.hls_to_rgb": {}},
     {"kornia.enhance.equalize_clahe": {}},
-    {"kornia.affine": {}},
     {"torch.select": {"params": {"input": "torch.Tensor", "dim": "int", "index": "int"},
                       "returns": {"out": "torch.Tensor"}}  # we do not know the types
     },
@@ -129,7 +128,7 @@ class ImageReader(Component):
                 self._idx += 1
         # images must be in the range [0, 1]
         image = image.div(255.)
-        self._outputs.set_param("image", image.clamp(0, 1))
+        self._outputs.set_param("image", image.clamp(0, 1).unsqueeze(0))
         self._outputs.set_param("name", str(self._value[self._idx].name))
         self._outputs.set_param("counter", f"{self._idx} / {len(self._value)}")
         self._idx += 1
@@ -162,7 +161,7 @@ class ImageShow(Component):
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         opts = {'title': self.name}
         # TODO: for batches use `images`
-        image = inputs.get_param("image")
+        image = inputs.get_param("image")[0]  # only the first image in the batch is shown
         if self._enabled:
             self._visdom.image(image, win=self.name, opts=opts)
             return ComponentState.OK

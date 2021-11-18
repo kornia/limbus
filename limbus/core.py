@@ -221,7 +221,7 @@ class ComponentsManager(nn.Module):
             from_name: the origin component member name. Can be a tuple (name, index) where index denotes the internal
                         element to be connected.
             _to: the destination component instance.
-            _to_name: the destination component member name. Can be a tuple (name, index) where index denotes the
+            to_name: the destination component member name. Can be a tuple (name, index) where index denotes the
                         internal element to be connected.
 
         """
