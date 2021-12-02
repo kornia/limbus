@@ -10,7 +10,6 @@ from matplotlib import pyplot as plt
 import numpy as np
 import PIL
 import torch
-from torch.utils.tensorboard import SummaryWriter
 import visdom
 import kornia
 
@@ -46,6 +45,15 @@ lst_components: List[ComponentBuilder] = [
                       "returns": "Sequence[torch.Tensor]"}
     },
     {"torch.stack": {"params": {"input": "Sequence[torch.Tensor]", "dim": "int"},
+                     "returns": {"out": "torch.Tensor"}}
+    },
+    {"torch.cat": {"params": {"input": "Sequence[torch.Tensor]", "dim": "int"},
+                     "returns": {"out": "torch.Tensor"}}
+    },
+    {"torch.unsqueeze": {"params": {"input": "torch.Tensor", "dim": "int"},
+                     "returns": {"out": "torch.Tensor"}}
+    },
+    {"torch.squeeze": {"params": {"input": "torch.Tensor", "dim": "Optional[int]"},
                      "returns": {"out": "torch.Tensor"}}
     }]
 
@@ -100,12 +108,13 @@ class ImageReader(Component):
         value: path to an image or image folder.
 
     """
-    def __init__(self, name: str, path: Path):
+    def __init__(self, name: str, path: Path, batch_size: int = 1):
         super().__init__(name)
         self._value: List[Path] = []
+        self._batch_size = batch_size
         self._idx = 0
         if Path(path).is_dir():
-            self._value = list(Path(path).glob("*"))
+            self._value = sorted(list(Path(path).glob("*")))
         else:
             self._value.append(Path(path))
 
@@ -113,25 +122,27 @@ class ImageReader(Component):
     def register_outputs() -> Params:  # noqa: D102
         outputs = Params()
         outputs.declare("image", torch.Tensor)
-        outputs.declare("name", str)
-        outputs.declare("counter", str)
         return outputs
         
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-        while True:
+        images: List[torch.Tensor] = []
+        batch_size = 0
+        while batch_size < self._batch_size:
             if self._idx >= len(self._value):
                 return ComponentState.STOPPED
             try:
-                image: torch.Tensor = kornia.image_to_tensor(np.asarray(PIL.Image.open(str(self._value[self._idx]))))
-                break
-            except:
+                images.append(
+                    kornia.image_to_tensor(np.asarray(PIL.Image.open(str(self._value[self._idx]))))
+                )
+                batch_size += 1
                 self._idx += 1
+            except:
+                # avoid crashing the whole pipeline when there is a corrupted image or non-image file
+                pass
+        batch = torch.stack(images)
         # images must be in the range [0, 1]
-        image = image.div(255.)
-        self._outputs.set_param("image", image.clamp(0, 1).unsqueeze(0))
-        self._outputs.set_param("name", str(self._value[self._idx].name))
-        self._outputs.set_param("counter", f"{self._idx} / {len(self._value)}")
-        self._idx += 1
+        batch = batch.div(255.).clamp(0, 1)
+        self._outputs.set_param("image", batch)
         return ComponentState.OK
 
 
@@ -161,9 +172,12 @@ class ImageShow(Component):
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         opts = {'title': self.name}
         # TODO: for batches use `images`
-        image = inputs.get_param("image")[0]  # only the first image in the batch is shown
+        images = inputs.get_param("image")
         if self._enabled:
-            self._visdom.image(image, win=self.name, opts=opts)
+            if images.shape[0] == 1:
+                self._visdom.image(images[0], win=self.name, opts=opts)
+            else:
+                self._visdom.images(images, nrow=int(images.shape[0]), win=self.name, opts=opts)
             return ComponentState.OK
         # TODO: find a way to notify when the component is DISABLED or retruns an ERROR
         return ComponentState.DISABLED
