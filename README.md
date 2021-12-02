@@ -1,5 +1,7 @@
 # Limbus: Computer Vision pipelining for PyTorch
 
+## (🚨 Warning: Unstable Prototype 🚨)
+
 [![CI](https://github.com/kornia/limbus/actions/workflows/ci.yml/badge.svg)](https://github.com/kornia/limbus/actions/workflows/ci.yml)
 
 Similar to the eye [*corneal limbus*](https://en.wikipedia.org/wiki/Corneal_limbus) - **Limbus** is a framework to create Computer Vision pipelines within the context of Deep Learning and writen in terms of differentiable tensors message passing on top of Kornia and PyTorch.
