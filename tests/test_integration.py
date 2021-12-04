@@ -1,5 +1,5 @@
 from limbus.core import ComponentsManager
-from limbus.components import Constant, Adder, Printer
+from limbus.components import Constant, Printer, Adder
 
 import torch
 
@@ -16,13 +16,7 @@ def test_pipeline():
     manager.connect(c2, "out", add, "b")
     manager.connect(add, "out", show, "inp")
 
-    # TODO: traverse should be called automatically with execute
     manager.traverse()
     manager.execute(1)
 
     torch.allclose(add.outputs.out, torch.ones(1, 3) * 3.)
-
-    # TODO: reset nodes
-    # manager.connect(c2, "out", add, "a")
-    # manager.traverse()
-    # manager.execute()

@@ -181,7 +181,6 @@ class Component(nn.Module):
         """
         return ComponentState.NotImplemented
 
-    @abstractmethod
     def finish_iter(self) -> None:
         """Event executed when a pipeline iter is finished."""
         pass

@@ -219,3 +219,30 @@ class Printer(Component):
         inp = inputs.get_param("inp")
         print(inp)
         return ComponentState.OK
+
+
+# Example of a simple component created from the API
+class Adder(Component):
+    """Component to add two inputs and output the result."""
+    def __init__(self, name: str):
+        super().__init__(name)
+
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
+        inputs = Params()
+        inputs.declare("a", torch.Tensor)
+        inputs.declare("b", torch.Tensor)
+        return inputs
+
+    @staticmethod
+    def register_outputs() -> Params:  # noqa: D102
+        outputs = Params()
+        outputs.declare("out", torch.Tensor)
+        return outputs
+
+    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
+        a = inputs.get_param("a")
+        b = inputs.get_param("b")
+        self._outputs.set_param("out", a + b)
+        return ComponentState.OK
+
