@@ -42,3 +42,7 @@ In order to regenerate the environment:
 cd limbus
 rm -rf .dev_end
 ```
+
+## Testing
+
+Run `pytest` and automatically will test: `cov`, `pydocstyle`, `mypy` and `flake8`

@@ -343,7 +343,7 @@ class ComponentsManager(nn.Module):
                         if len(links) > 1:
                             # if we have more than one link per pin they must be slices
                             try:
-                                typeguard.check_type("",link, Dict[int, _Link])
+                                typeguard.check_type("", link, Dict[int, _Link])
                             except:
                                 raise ValueError(f"There are several links connected to the input pin '{pin}' in "
                                                  f"'{obj.__repr__()}'. Input pins do not accept multiple assignements.")
@@ -425,7 +425,7 @@ def component_factory(callable_to_wrap: Union[Callable, type]) -> Component:
 
     if inspect.isclass(callable_to_wrap):
         assert isinstance(callable_to_wrap, type)
-        if not nn.Module in inspect.getmro(callable_to_wrap):
+        if nn.Module not in inspect.getmro(callable_to_wrap):
             raise TypeError(f"{callable_to_wrap} does not inherit from nn.Module.")
         return _component_nn_factory(callable_to_wrap)
     raise TypeError(f"{callable_to_wrap} must be a function or an nn.Module.")

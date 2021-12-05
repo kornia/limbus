@@ -22,6 +22,8 @@ class ExtraParams(TypedDict, total=False):
     """Typing for the arguments."""
     params: Dict[str, str]
     returns: Union[str, Dict[str, str], List[str]]
+
+
 ComponentBuilder = Dict[str, ExtraParams]
 
 # ways to declare a component:
@@ -39,23 +41,29 @@ lst_components: List[ComponentBuilder] = [
     {"kornia.color.hls_to_rgb": {}},
     {"kornia.enhance.equalize_clahe": {}},
     {"torch.select": {"params": {"input": "torch.Tensor", "dim": "int", "index": "int"},
-                      "returns": {"out": "torch.Tensor"}}  # we do not know the types
-    },
+                      "returns": {"out": "torch.Tensor"}
+                      }  # we do not know the types
+     },
     {"torch.unbind": {"params": {"input": "torch.Tensor", "dim": "int"},
                       "returns": "Sequence[torch.Tensor]"}
-    },
+     },
     {"torch.stack": {"params": {"input": "Sequence[torch.Tensor]", "dim": "int"},
-                     "returns": {"out": "torch.Tensor"}}
-    },
+                     "returns": {"out": "torch.Tensor"}
+                     }
+     },
     {"torch.cat": {"params": {"input": "Sequence[torch.Tensor]", "dim": "int"},
-                     "returns": {"out": "torch.Tensor"}}
-    },
+                   "returns": {"out": "torch.Tensor"}
+                   }
+     },
     {"torch.unsqueeze": {"params": {"input": "torch.Tensor", "dim": "int"},
-                     "returns": {"out": "torch.Tensor"}}
-    },
+                         "returns": {"out": "torch.Tensor"}
+                         }
+     },
     {"torch.squeeze": {"params": {"input": "torch.Tensor", "dim": "Optional[int]"},
-                     "returns": {"out": "torch.Tensor"}}
-    }]
+                       "returns": {"out": "torch.Tensor"}
+                       }
+     }]
+
 
 # TODO: add type checking when it is possible, validate that the number of input/outputs make sense...
 def _create_ret_namedtuple(returns: Union[Dict[str, str], List[str]], tp: str, name: str) -> str:
@@ -66,6 +74,7 @@ def _create_ret_namedtuple(returns: Union[Dict[str, str], List[str]], tp: str, n
         named_tpl = f"namedtuple('{tp}', returns.keys(), defaults=list(map(eval, returns.values())))"
     globals()[tp] = eval(named_tpl)
     return tp
+
 
 cmp: ComponentBuilder
 for cmp in lst_components:
@@ -90,8 +99,8 @@ for cmp in lst_components:
             # NOTE: there is a trick to have acces to the name of the output parameters. The function signature
             # requires a namedtuple, however the return of the function is not a namedtuple.
             # Returning a namedtuple here is complex.
-            str_params = str(params).replace("'","").replace("{","").replace("}","")
-            str_ret_params = str(tuple(params.keys())).replace("'","")
+            str_params = str(params).replace("'", "").replace("{", "").replace("}", "")
+            str_ret_params = str(tuple(params.keys())).replace("'", "")
             func = f"def {str_name}({str_params}) -> {returns}:\n    return real_func{str_ret_params}\n"
             code = compile(func, __file__, "exec")
             eval(code, {"real_func": fn_name}, globals())
@@ -123,7 +132,7 @@ class ImageReader(Component):
         outputs = Params()
         outputs.declare("image", torch.Tensor)
         return outputs
-        
+
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         images: List[torch.Tensor] = []
         batch_size = 0
@@ -156,7 +165,7 @@ class ImageShow(Component):
         except:
             self._enabled = False
 
-        if self._enabled == False:
+        if not self._enabled:
             log.warning("ImageShow is disabled!!!")
             return
 
@@ -271,8 +280,8 @@ class ImageStitcher(Component):
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         self._outputs.set_param("out", self._is(*(inputs.get_param("imgs").unsqueeze(1))))
         return ComponentState.OK
-    
-    
+
+
 class ImageRegistrator(Component):
     """Component to register images."""
     def __init__(self, name: str):
