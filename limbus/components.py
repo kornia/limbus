@@ -246,3 +246,52 @@ class Adder(Component):
         self._outputs.set_param("out", a + b)
         return ComponentState.OK
 
+
+# temporal classes while we solve pending issues. TODO: allow components as parameters
+class ImageStitcher(Component):
+    """Component to stitch images together."""
+    def __init__(self, name: str, estimator: str = 'ransac', blending_method: str = 'naive'):
+        super().__init__(name)
+        gftt_hardnet_matcher = kornia.feature.LocalFeatureMatcher(kornia.feature.GFTTAffNetHardNet(500),
+                                                                  kornia.feature.DescriptorMatcher('snn', 0.8))
+        self._is = kornia.contrib.ImageStitcher(gftt_hardnet_matcher, estimator, blending_method)
+
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
+        outputs = Params()
+        outputs.declare("imgs", torch.Tensor)
+        return outputs
+
+    @staticmethod
+    def register_outputs() -> Params:  # noqa: D102
+        outputs = Params()
+        outputs.declare("out", torch.Tensor)
+        return outputs
+
+    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
+        self._outputs.set_param("out", self._is(*(inputs.get_param("imgs").unsqueeze(1))))
+        return ComponentState.OK
+    
+    
+class ImageRegistrator(Component):
+    """Component to register images."""
+    def __init__(self, name: str):
+        super().__init__(name)
+        self._ir = kornia.geometry.ImageRegistrator()
+
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
+        outputs = Params()
+        outputs.declare("img_src", torch.Tensor)
+        outputs.declare("img_dst", torch.Tensor)
+        return outputs
+
+    @staticmethod
+    def register_outputs() -> Params:  # noqa: D102
+        outputs = Params()
+        outputs.declare("homo", torch.Tensor)
+        return outputs
+
+    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
+        self._outputs.set_param("homo", self._ir.register(inputs.get_param("img_src"), inputs.get_param("img_dst")))
+        return ComponentState.OK
