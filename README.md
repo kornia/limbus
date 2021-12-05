@@ -40,7 +40,7 @@ source path.bash.inc
 In order to regenerate the environment:
 ```bash
 cd limbus
-rm -rf .dev_end
+rm -rf .dev_env
 ```
 
 ## Testing
