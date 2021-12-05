@@ -42,5 +42,9 @@ source path.bash.inc
 In order to regenerate the environment:
 ```bash
 cd limbus
-rm -rf .dev_end
+rm -rf .dev_env
 ```
+
+## Testing
+
+Run `pytest` and automatically will test: `cov`, `pydocstyle`, `mypy` and `flake8`

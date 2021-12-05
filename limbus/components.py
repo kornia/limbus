@@ -1,5 +1,5 @@
 """Some predefined components."""
-from typing import Any, Callable, List, NamedTuple, Union, cast, Tuple, Dict, TypedDict, Optional, Literal
+from typing import Any, Callable, List, NamedTuple, Union, cast, Tuple, Dict, TypedDict, Optional, Literal, Sequence
 from collections import namedtuple
 from pathlib import Path
 import hashlib
@@ -10,7 +10,6 @@ from matplotlib import pyplot as plt
 import numpy as np
 import PIL
 import torch
-from torch.utils.tensorboard import SummaryWriter
 import visdom
 import kornia
 
@@ -23,6 +22,8 @@ class ExtraParams(TypedDict, total=False):
     """Typing for the arguments."""
     params: Dict[str, str]
     returns: Union[str, Dict[str, str], List[str]]
+
+
 ComponentBuilder = Dict[str, ExtraParams]
 
 # ways to declare a component:
@@ -39,12 +40,30 @@ lst_components: List[ComponentBuilder] = [
     {"kornia.color.rgb_to_hls": {"returns": "torch.Tensor"}},
     {"kornia.color.hls_to_rgb": {}},
     {"kornia.enhance.equalize_clahe": {}},
-    {"kornia.affine": {}},
-    {"torch.select": {
-      "params": {"input": "torch.Tensor", "dim": "int", "index": "int"},
-      "returns": {"out": "torch.Tensor"}}  # we do not know the types
-    }
-    ]
+    {"torch.select": {"params": {"input": "torch.Tensor", "dim": "int", "index": "int"},
+                      "returns": {"out": "torch.Tensor"}
+                      }  # we do not know the types
+     },
+    {"torch.unbind": {"params": {"input": "torch.Tensor", "dim": "int"},
+                      "returns": "Sequence[torch.Tensor]"}
+     },
+    {"torch.stack": {"params": {"input": "Sequence[torch.Tensor]", "dim": "int"},
+                     "returns": {"out": "torch.Tensor"}
+                     }
+     },
+    {"torch.cat": {"params": {"input": "Sequence[torch.Tensor]", "dim": "int"},
+                   "returns": {"out": "torch.Tensor"}
+                   }
+     },
+    {"torch.unsqueeze": {"params": {"input": "torch.Tensor", "dim": "int"},
+                         "returns": {"out": "torch.Tensor"}
+                         }
+     },
+    {"torch.squeeze": {"params": {"input": "torch.Tensor", "dim": "Optional[int]"},
+                       "returns": {"out": "torch.Tensor"}
+                       }
+     }]
+
 
 # TODO: add type checking when it is possible, validate that the number of input/outputs make sense...
 def _create_ret_namedtuple(returns: Union[Dict[str, str], List[str]], tp: str, name: str) -> str:
@@ -55,6 +74,7 @@ def _create_ret_namedtuple(returns: Union[Dict[str, str], List[str]], tp: str, n
         named_tpl = f"namedtuple('{tp}', returns.keys(), defaults=list(map(eval, returns.values())))"
     globals()[tp] = eval(named_tpl)
     return tp
+
 
 cmp: ComponentBuilder
 for cmp in lst_components:
@@ -79,8 +99,8 @@ for cmp in lst_components:
             # NOTE: there is a trick to have acces to the name of the output parameters. The function signature
             # requires a namedtuple, however the return of the function is not a namedtuple.
             # Returning a namedtuple here is complex.
-            str_params = str(params).replace("'","").replace("{","").replace("}","")
-            str_ret_params = str(tuple(params.keys())).replace("'","")
+            str_params = str(params).replace("'", "").replace("{", "").replace("}", "")
+            str_ret_params = str(tuple(params.keys())).replace("'", "")
             func = f"def {str_name}({str_params}) -> {returns}:\n    return real_func{str_ret_params}\n"
             code = compile(func, __file__, "exec")
             eval(code, {"real_func": fn_name}, globals())
@@ -97,12 +117,13 @@ class ImageReader(Component):
         value: path to an image or image folder.
 
     """
-    def __init__(self, name: str, path: Path):
+    def __init__(self, name: str, path: Path, batch_size: int = 1):
         super().__init__(name)
         self._value: List[Path] = []
+        self._batch_size = batch_size
         self._idx = 0
         if Path(path).is_dir():
-            self._value = list(Path(path).glob("*"))
+            self._value = sorted(list(Path(path).glob("*")))
         else:
             self._value.append(Path(path))
 
@@ -110,135 +131,29 @@ class ImageReader(Component):
     def register_outputs() -> Params:  # noqa: D102
         outputs = Params()
         outputs.declare("image", torch.Tensor)
-        outputs.declare("name", str)
-        outputs.declare("counter", str)
         return outputs
-        
+
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-        while True:
+        images: List[torch.Tensor] = []
+        batch_size = 0
+        while batch_size < self._batch_size:
             if self._idx >= len(self._value):
                 return ComponentState.STOPPED
             try:
-                image: torch.Tensor = kornia.image_to_tensor(np.asarray(PIL.Image.open(str(self._value[self._idx]))))
-                break
-            except:
+                images.append(
+                    kornia.image_to_tensor(np.asarray(PIL.Image.open(str(self._value[self._idx]))))
+                )
+                batch_size += 1
                 self._idx += 1
+            except:
+                # avoid crashing the whole pipeline when there is a corrupted image or non-image file
+                pass
+        batch = torch.stack(images)
         # images must be in the range [0, 1]
-        image = image.div(255.)
-        self._outputs.set_param("image", image.clamp(0, 1))
-        self._outputs.set_param("name", str(self._value[self._idx].name))
-        self._outputs.set_param("counter", f"{self._idx} / {len(self._value)}")
-        self._idx += 1
+        batch = batch.div(255.).clamp(0, 1)
+        self._outputs.set_param("image", batch)
         return ComponentState.OK
 
-
-class Unbind(Component):
-    """Component to unbind one tensor."""
-    value = 3
-
-    def __init__(self, name: str, value: int):
-        Unbind.value = value
-        super().__init__(name)
-
-    @staticmethod
-    def register_inputs() -> Params:  # noqa: D102
-        inputs = Params()
-        inputs.declare("inp", torch.Tensor)
-        return inputs
-
-    @staticmethod
-    def register_outputs() -> Params:  # noqa: D102
-        outputs = Params()
-        for v in range(Unbind.value):
-            outputs.declare(str(v), torch.Tensor)
-        return outputs
-
-    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-        inp = inputs.get_param("inp")
-        out: List[torch.Tensor] = cast(List[torch.Tensor], torch.unbind(inp, -3))
-        for idx, v in enumerate(out):
-            # NOTE: we are not controlling if we are adding more pins
-            self._outputs.set_param(str(idx), v)
-        return ComponentState.OK
-
-
-class Stack(Component):
-    """Component to stack tensors."""
-    value = 3
-
-    def __init__(self, name: str, value: int):
-        Stack.value = value
-        super().__init__(name)
-
-    @staticmethod
-    def register_inputs() -> Params:  # noqa: D102
-        inputs = Params()
-        for v in range(Stack.value):
-            inputs.declare(str(v), torch.Tensor)
-        return inputs
-    
-    @staticmethod
-    def register_outputs() -> Params:  # noqa: D102
-        outputs = Params()
-        outputs.declare("out", torch.Tensor)
-        return outputs
-    
-    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-        tensors: List[torch.Tensor] = [inputs[str(idx)] for idx in range(Stack.value)]
-        self._outputs.set_param("out", torch.stack(tensors))
-        return ComponentState.OK
-
-
-# class ImageShowM(Component):
-#     """Component to show the input image."""
-#     def __init__(self, name: str):
-#         super().__init__(name)
-# 
-#     @staticmethod
-#     def register_inputs() -> Params:  # noqa: D102
-#         inputs = Params()
-#         inputs.declare("image", torch.Tensor)
-#         return inputs
-# 
-#     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-#         image = inputs.get_param("image")
-#         if image.dim() == 2:
-#             image = image[None].repeat(3, 1, 1)
-#         img: np.ndarray = kornia.tensor_to_image(
-#             image.mul(255).clamp(0, 255).int())
-#         fig = plt.figure(int(hashlib.md5(self._name.encode()).hexdigest(), 16))
-#         fig.canvas.set_window_title(self._name)
-#         fig.add_subplot(111).imshow(img)
-#         plt.show(block=False)
-#         return ComponentState.OK
-# 
-#     def finish_iter(self) -> None:  # noqa: D102
-#         plt.show()
-#
-#
-# class ImageShowTensorboard(Component):
-#     """Component to show the input image."""
-#     def __init__(self, name: str):
-#         super().__init__(name)
-#         self._writer = SummaryWriter('tensorboard')
-# 
-#     @staticmethod
-#     def register_inputs() -> Params:  # noqa: D102
-#         inputs = Params()
-#         inputs.declare("image", torch.Tensor)
-#         return inputs
-# 
-#     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-#         image = inputs.get_param("image")
-#         self._writer.add_image(self.name, image)
-#         return ComponentState.OK
-# 
-#     def finish_iter(self) -> None:  # noqa: D102
-#         self._writer.flush()
-# 
-#     def __del__(self):
-#         self._writer.close()
-# 
 
 class ImageShow(Component):
     """Component to show the input image."""
@@ -250,7 +165,7 @@ class ImageShow(Component):
         except:
             self._enabled = False
 
-        if self._enabled == False:
+        if not self._enabled:
             log.warning("ImageShow is disabled!!!")
             return
 
@@ -266,9 +181,12 @@ class ImageShow(Component):
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
         opts = {'title': self.name}
         # TODO: for batches use `images`
-        image = inputs.get_param("image")
+        images = inputs.get_param("image")
         if self._enabled:
-            self._visdom.image(image, win=self.name, opts=opts)
+            if images.shape[0] == 1:
+                self._visdom.image(images[0], win=self.name, opts=opts)
+            else:
+                self._visdom.images(images, nrow=int(images.shape[0]), win=self.name, opts=opts)
             return ComponentState.OK
         # TODO: find a way to notify when the component is DISABLED or retruns an ERROR
         return ComponentState.DISABLED
@@ -312,51 +230,77 @@ class Printer(Component):
         return ComponentState.OK
 
 
-# class Adder(Component):
-#     """Component to add two inputs and output the result."""
-#     def __init__(self, name: str):
-#         super().__init__(name)
-# 
-#     @staticmethod
-#     def register_inputs() -> Params:  # noqa: D102
-#         inputs = Params()
-#         inputs.declare("a", torch.Tensor)
-#         inputs.declare("b", torch.Tensor)
-#         return inputs
-# 
-#     @staticmethod
-#     def register_outputs() -> Params:  # noqa: D102
-#         outputs = Params()
-#         outputs.declare("out", torch.Tensor)
-#         return outputs
-# 
-#     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-#         a = inputs.get_param("a")
-#         b = inputs.get_param("b")
-#         self._outputs.set_param("out", a + b)
-#         return ComponentState.OK
-#
-#
-# class Multiplier(Component):
-#     """Component to multiply two inputs and output the result."""
-#     def __init__(self, name: str):
-#         super().__init__(name)
-# 
-#     @staticmethod
-#     def register_inputs() -> Params:  # noqa: D102
-#         inputs = Params()
-#         inputs.declare("a", torch.Tensor)
-#         inputs.declare("b", torch.Tensor)
-#         return inputs
-# 
-#     @staticmethod
-#     def register_outputs() -> Params:  # noqa: D102
-#         outputs = Params()
-#         outputs.declare("out", torch.Tensor)
-#         return outputs
-# 
-#     def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-#         a = inputs.get_param("a")
-#         b = inputs.get_param("b")
-#         self._outputs.set_param("out", a * b)
-#         return ComponentState.OK
+# Example of a simple component created from the API
+class Adder(Component):
+    """Component to add two inputs and output the result."""
+    def __init__(self, name: str):
+        super().__init__(name)
+
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
+        inputs = Params()
+        inputs.declare("a", torch.Tensor)
+        inputs.declare("b", torch.Tensor)
+        return inputs
+
+    @staticmethod
+    def register_outputs() -> Params:  # noqa: D102
+        outputs = Params()
+        outputs.declare("out", torch.Tensor)
+        return outputs
+
+    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
+        a = inputs.get_param("a")
+        b = inputs.get_param("b")
+        self._outputs.set_param("out", a + b)
+        return ComponentState.OK
+
+
+# temporal classes while we solve pending issues. TODO: allow components as parameters
+class ImageStitcher(Component):
+    """Component to stitch images together."""
+    def __init__(self, name: str, estimator: str = 'ransac', blending_method: str = 'naive'):
+        super().__init__(name)
+        gftt_hardnet_matcher = kornia.feature.LocalFeatureMatcher(kornia.feature.GFTTAffNetHardNet(500),
+                                                                  kornia.feature.DescriptorMatcher('snn', 0.8))
+        self._is = kornia.contrib.ImageStitcher(gftt_hardnet_matcher, estimator, blending_method)
+
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
+        outputs = Params()
+        outputs.declare("imgs", torch.Tensor)
+        return outputs
+
+    @staticmethod
+    def register_outputs() -> Params:  # noqa: D102
+        outputs = Params()
+        outputs.declare("out", torch.Tensor)
+        return outputs
+
+    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
+        self._outputs.set_param("out", self._is(*(inputs.get_param("imgs").unsqueeze(1))))
+        return ComponentState.OK
+
+
+class ImageRegistrator(Component):
+    """Component to register images."""
+    def __init__(self, name: str):
+        super().__init__(name)
+        self._ir = kornia.geometry.ImageRegistrator()
+
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
+        outputs = Params()
+        outputs.declare("img_src", torch.Tensor)
+        outputs.declare("img_dst", torch.Tensor)
+        return outputs
+
+    @staticmethod
+    def register_outputs() -> Params:  # noqa: D102
+        outputs = Params()
+        outputs.declare("homo", torch.Tensor)
+        return outputs
+
+    def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
+        self._outputs.set_param("homo", self._ir.register(inputs.get_param("img_src"), inputs.get_param("img_dst")))
+        return ComponentState.OK
