@@ -1,5 +1,5 @@
 from .core import ComponentsManager, Component, DefaultParam, ComponentState, Params, NoValue
-from .factory import component_factory
+from .factory import ComponentDefinition, register_components
 
 __all__ = [
     "ComponentsManager",
@@ -7,5 +7,6 @@ __all__ = [
     "DefaultParam",
     "ComponentState",
     "Params",
-    "component_factory",
+    "register_components",
+    "ComponentDefinition",
     "NoValue"]
