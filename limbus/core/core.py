@@ -2,12 +2,11 @@
 from abc import abstractmethod
 import builtins
 import typing
-from typing import Callable, Dict, Any, List, Collection, Optional, Tuple, cast, Union, OrderedDict
+from typing import Dict, Any, List, Collection, Optional, Tuple, Union, OrderedDict
 from enum import Enum
 from dataclasses import dataclass
 import logging
 import time
-import inspect
 import collections
 
 import typeguard
@@ -15,8 +14,6 @@ import kornia
 import torch
 import torch.nn as nn
 
-# the signature obtained from inspect.signature changes Optional to NoneType
-NoneType = type(None)
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)

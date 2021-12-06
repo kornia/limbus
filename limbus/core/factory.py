@@ -9,6 +9,10 @@ import torch.nn as nn
 from ..core import Component, ComponentState, Params, NoValue
 
 
+# the signature obtained from inspect.signature changes Optional to NoneType
+NoneType = type(None)
+
+
 def component_factory(callable_to_wrap: Union[Callable, type]) -> Component:
     """Generate a Component class for a given callable.
 
@@ -194,6 +198,7 @@ def _component_nn_factory(callable_to_wrap: type) -> Component:
                 outputs.declare("out", sign.return_annotation)
         return outputs
 
+    # convert signature parameters into Params
     sign: inspect.Signature = inspect.signature(callable_to_wrap)
     args = Params()
     for param in sign.parameters.values():
@@ -202,6 +207,7 @@ def _component_nn_factory(callable_to_wrap: type) -> Component:
         else:
             args.declare(param.name, param.annotation, param.default)
 
+    # create an string containing all the parameters for the __init__ method as if they were written by hand
     str_params: str = ""
     str_args: str = ""
     for arg in args.get_params():
@@ -223,6 +229,7 @@ def _component_nn_factory(callable_to_wrap: type) -> Component:
             else:
                 str_params += f" = {value}"
 
+    # template for the class to be created
     str_params = f"self, name: str, {str_params}"  # add the name parameter required by teh component
     str_name = f"{callable_to_wrap.__module__}.{callable_to_wrap.__name__}".replace(".", "___")
     func = (f"class {str_name}(Component):\n"

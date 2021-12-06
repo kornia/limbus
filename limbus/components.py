@@ -140,11 +140,11 @@ class ImageReader(Component):
             if self._idx >= len(self._value):
                 return ComponentState.STOPPED
             try:
+                self._idx += 1
                 images.append(
                     kornia.image_to_tensor(np.asarray(PIL.Image.open(str(self._value[self._idx]))))
                 )
                 batch_size += 1
-                self._idx += 1
             except:
                 # avoid crashing the whole pipeline when there is a corrupted image or non-image file
                 pass
