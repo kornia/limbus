@@ -1,6 +1,6 @@
 import pytest
 
-from limbus.components import Constant, Adder
+from limbus.components import limbus___Constant as Constant, limbus___Adder as Adder  # type: ignore
 from limbus.core import NoValue
 import torch
 
