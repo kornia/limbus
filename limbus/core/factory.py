@@ -175,7 +175,33 @@ def register_components(comp_globals: Dict[str, Any], lst_components: List[Compo
             code = compile(func, comp_globals["__file__"], "exec")
             eval(code, {"real_func": fn_name}, comp_globals)
             # create the component from the callable
-            component_factory(name, comp_globals[str_name], comp_globals)
+def register_component(cls) -> None:
+    """Define a decorator to register a component.
+
+    Args:
+        cls: class to be registered.
+        module: module where the class is defined.
+
+    Returns:
+        cls: class to be registered.
+
+    Example:
+        >>> @register_component("your_module.your_submodule")
+        >>> class YourComponent(Component):
+        >>>     ...
+
+        Will register the component as:
+        limbus.component.your_module___your_submodule___YourComponent
+
+    """
+    module = cls.__module__
+    if cls.__module__ == "limbus.components.base" or cls.__module__ == "__main__":
+        # the base components will appear in the limbus module
+        module = "limbus"
+    _add_modules_to_globals([module])
+    str_module: str = module.replace(".", "___")
+    COMP_GLOBALS[f"{str_module}___{cls.__name__}"] = cls
+    return cls
 
 
 # define the factory function to create components automatically

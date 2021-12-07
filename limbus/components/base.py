@@ -1,4 +1,15 @@
-"""Some predefined components."""
+"""Some predefined components.
+
+All the components are "saved" as classes in limbus.components, being the original module name used
+to create a clear name for the component.
+E.g.:
+limbus.components.base.ImageReader -> limbus.components.limbus___ImageReader
+torch.unbind                       -> limbus.components.torch___unbind
+kornia.color.rgb_to_hls            -> limbus.components.kornia___color___rgb_to_hls
+
+The components automatically created are always saved in the limbus.components module using ___ to
+denote the original module.
+"""
 from typing import Any, List
 from pathlib import Path
 import logging
@@ -9,9 +20,11 @@ import torch
 import visdom
 import kornia
 
-from limbus.core import Component, ComponentState, Params, register_components, ComponentDefinition
+from limbus.core import Component, ComponentState, Params, register_components, register_component, ComponentDefinition
+
 
 log = logging.getLogger(__name__)
+
 
 # ways to declare a component:
 # 1.- Params can be obtained with inspect and 1 output:
@@ -23,6 +36,28 @@ log = logging.getLogger(__name__)
 #                          "returns": {"output0": "typing0"}}
 # NOTE: second way also accepts typing ans in the third way.
 lst_components: List[ComponentDefinition] = [
+    {"kornia.augmentation.RandomCrop": {}},
+    {"kornia.geometry.transform.warp_perspective": {}},
+    {"kornia.feature.LoFTR": {}},
+    {"kornia.contrib.ImageStitcher": {}},
+    {"kornia.contrib.histogram_matching": {}},
+    {"kornia.geometry.transform.center_crop": {}},
+    {"kornia.geometry.transform.crop_and_resize": {}},
+    {"kornia.geometry.transform.Scale": {}},
+    {"kornia.geometry.transform.Rotate": {}},
+    {"kornia.geometry.transform.Translate": {}},
+    {"kornia.geometry.transform.Shear": {}},
+    {"kornia.geometry.transform.PyrDown": {}},
+    {"kornia.geometry.transform.PyrUp": {}},
+    {"kornia.geometry.transform.ScalePyramid": {}},
+    {"kornia.geometry.transform.Hflip": {}},
+    {"kornia.geometry.transform.Vflip": {}},
+    {"kornia.geometry.transform.Rot180": {}},
+    {"kornia.geometry.transform.Resize": {}},
+    {"kornia.geometry.transform.Rescale": {}},
+    {"kornia.geometry.transform.Affine": {}},
+    {"kornia.geometry.transform.HomographyWarper": {}},
+    {"kornia.enhance.normalize_min_max": {}},
     {"kornia.enhance.image_histogram2d": {"returns": ["out", "out2"]}},  # we already know the types
     {"kornia.color.rgb_to_hls": {"returns": "torch.Tensor"}},
     {"kornia.color.hls_to_rgb": {}},
@@ -52,9 +87,10 @@ lst_components: List[ComponentDefinition] = [
      }]
 
 # automatic register of all the components in the list of components
-register_components(globals(), lst_components)
+register_components(lst_components)
 
 
+@register_component
 class ImageReader(Component):
     """Component that holds a constant.
 
@@ -101,6 +137,7 @@ class ImageReader(Component):
         return ComponentState.OK
 
 
+@register_component
 class ImageShow(Component):
     """Component to show the input image."""
     def __init__(self, name: str):
@@ -141,6 +178,7 @@ class ImageShow(Component):
         pass
 
 
+@register_component
 class Constant(Component):
     """Component that holds a constant."""
     def __init__(self, name: str, value: Any):
@@ -159,6 +197,7 @@ class Constant(Component):
         return ComponentState.OK
 
 
+@register_component
 class Printer(Component):
     """Component to print the input in the console."""
     def __init__(self, name: str):
@@ -177,6 +216,7 @@ class Printer(Component):
 
 
 # Example of a simple component created from the API
+@register_component
 class Adder(Component):
     """Component to add two inputs and output the result."""
     def __init__(self, name: str):
@@ -203,6 +243,7 @@ class Adder(Component):
 
 
 # temporal classes while we solve pending issues. TODO: allow components as parameters
+@register_component
 class ImageStitcher(Component):
     """Component to stitch images together."""
     def __init__(self, name: str, estimator: str = 'ransac', blending_method: str = 'naive'):
@@ -228,6 +269,7 @@ class ImageStitcher(Component):
         return ComponentState.OK
 
 
+@register_component
 class ImageRegistrator(Component):
     """Component to register images."""
     def __init__(self, name: str):
