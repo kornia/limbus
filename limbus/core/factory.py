@@ -125,7 +125,7 @@ def _build_returns(returns: Union[str, Dict[str, str], List[str]],
 
 
 def register_components(comp_globals: Dict[str, Any], lst_components: List[ComponentDefinition]) -> None:
-    """Register all teh components of a list of components.
+    """Register all the components of a list of components.
 
     Args:
         comp_globals: globals() of the module where the components will be defined.
