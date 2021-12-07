@@ -54,6 +54,7 @@ lst_components: List[ComponentBuilder] = [
 # automatic register of all the components in the list of components
 register_components(globals(), lst_components)
 
+
 class ImageReader(Component):
     """Component that holds a constant.
 

@@ -14,7 +14,7 @@ from limbus.core import Component, ComponentState, Params, NoValue
 NoneType = type(None)
 
 
-# define ComponentBuilder which is the structure containing the required data to build components automatically
+# define ComponentDefinition which is the structure containing the required data to build components automatically
 class ExtraParams(TypedDict, total=False):
     """Typing for the arguments."""
     params: Dict[str, str]
@@ -178,9 +178,9 @@ def register_components(comp_globals: Dict[str, Any], lst_components: List[Compo
             component_factory(name, comp_globals[str_name], comp_globals)
 
 
-# define the factory functions to create components automatically
+# define the factory function to create components automatically
 def component_factory(name: str, callable_to_wrap: Union[Callable, type], comp_globals: Dict[str, Any]) -> None:
-    """Generate a Component class for a given callable and add it to the globals.
+    """Generate a Component class for a given callable/nn.Module and add it to the globals.
 
     Args:
         name: name of the function to be wrapped as a component.
@@ -188,113 +188,30 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], comp_g
         comp_globals: globals() of the module where the components will be defined.
 
     """
-    # torch functions are builtin, not standard functions
-    if inspect.isfunction(callable_to_wrap) or inspect.isbuiltin(callable_to_wrap):
-        return _component_func_factory(name, callable_to_wrap, comp_globals)
-
-    if inspect.isclass(callable_to_wrap):
-        assert isinstance(callable_to_wrap, type)
-        if nn.Module not in inspect.getmro(callable_to_wrap):
-            raise TypeError(f"{callable_to_wrap} does not inherit from nn.Module.")
-        return _component_nn_factory(name, callable_to_wrap, comp_globals)
-    raise TypeError(f"{callable_to_wrap} must be a function or an nn.Module.")
-
-
-def _component_func_factory(name: str, callable_to_wrap: Callable, comp_globals: Dict[str, Any]) -> None:
-    """Generate a Component class for a given function and add it to the globals.
-
-    Args:
-        name: name of the function to be wrapped as a component.
-        callable_to_wrap: function to be wrapped as a component.
-        comp_globals: globals() of the module where the components will be defined.
-
-    """
-    # overwrite the forward(), register_inputs() and register_outputs() methods.
-    def forward(self, inputs: Params) -> ComponentState:  # noqa: D417
-        """Run the component.
-
-        Args:
-            inputs: set of values to be used to run the component.
-
-        """
-        args: Dict[str, Any] = {}
-        for param in self._inputs.get_params():
-            args[param] = inputs.get_param(param)
-
-        res = callable_to_wrap(**args)
-
-        if len(self._outputs.get_params()) > 1:
-            for idx, param in enumerate(self._outputs.get_params()):
-                self._outputs.set_param(param, res[idx])
-        else:
-            param = list(self._outputs.get_params())[0]
-            self._outputs.set_param(param, res)
-        return ComponentState.OK
-
-    def register_inputs() -> Params:
-        """Register the inputs params.
-
-        Returns:
-            input params
-
-        """
-        inputs = Params()
-        sign: inspect.Signature = inspect.signature(callable_to_wrap)
-        for param in sign.parameters.values():
-            if param.default is param.empty:
-                inputs.declare(param.name, param.annotation)
-            else:
-                inputs.declare(param.name, param.annotation, param.default)
-        return inputs
-
-    def register_outputs() -> Params:
-        """Register the output params.
-
-        Returns:
-            output params
-
-        """
-        def isinstance_namedtuple(obj) -> bool:
-            if typeguard.isclass(obj):
-                return issubclass(obj, tuple) and hasattr(obj, '_asdict') and hasattr(obj, '_fields')
-            return False
-        outputs = Params()
-        sign: inspect.Signature = inspect.signature(callable_to_wrap)
-        if isinstance_namedtuple(sign.return_annotation):
-            # variable number of outputs
-            for k, v in sign.return_annotation._field_defaults.items():
-                outputs.declare(k, v)
-        else:
-            if not typeguard.isclass(sign.return_annotation) and sign.return_annotation._name == "Tuple":
-                # variable number of outputs
-                for idx, arg in enumerate(sign.return_annotation.__args__):
-                    outputs.declare(f"out{idx}", arg)
-            else:
-                # single output case
-                outputs.declare("out", sign.return_annotation)
-        return outputs
-
     # add the NoneType type to the globals.
     # NOTE: This type is returned by inspect.signature but it does not exist
     comp_globals['NoneType'] = NoneType
 
-    str_name = name.replace(".", "___")
-    comp_globals[str_name] = cast(Component, type(
-        str_name, (Component,),
-        {"forward": forward, "register_inputs": register_inputs, "register_outputs": register_outputs})
-    )
+    # ATTENTION: In this function "callable_forward" var is used as pointer to change
+    # the job done inside the new component class. The register_inputs() and register_outputs() methods use directly
+    # this var to get teh input and output params. The forward() is a bit trickier since the self._callable_forward
+    # var is assigned inside the template of the component class.
+    callable_forward: Union[Callable, type]
 
+    # 1. define those vars
+    # --------------------
+    # We need to distinguish between functions and nn.Modules.
+    if inspect.isfunction(callable_to_wrap) or inspect.isbuiltin(callable_to_wrap):  # torch functions are builtin
+        # in this case the "callable_forward" is directly the callable
+        callable_forward = callable_to_wrap
+    elif isinstance(callable_to_wrap, type) and nn.Module in inspect.getmro(callable_to_wrap):
+        # in this case "callable_forward" refers to the forward method in the original nn.Module
+        callable_forward = callable_to_wrap.forward  # type: ignore  # mypy don't know about the forward method
+    else:
+        raise TypeError(f"{callable_to_wrap} must be a function or an nn.Module.")
 
-def _component_nn_factory(name: str, callable_to_wrap: type, comp_globals: Dict[str, Any]) -> None:
-    """Generate a Component class for a given class and add it to the globals.
-
-    Args:
-        name: name of the function to be wrapped as a component.
-        callable_to_wrap: class to be wrapped as a component.
-        comp_globals: globals() of the module where the components will be defined.
-
-    """
-    # overwrite the forward(), register_inputs() and register_outputs() methods.
+    # 2. define the forward(), register_inputs() and register_outputs() methods
+    # -------------------------------------------------------------------------
     def forward(self, inputs: Params) -> ComponentState:  # noqa: D417
         """Run the component.
 
@@ -305,10 +222,8 @@ def _component_nn_factory(name: str, callable_to_wrap: type, comp_globals: Dict[
         args: Dict[str, Any] = {}
         for param in self._inputs.get_params():
             args[param] = inputs.get_param(param)
-
-        # mypy cannot infer that the class has a forward method
-        res = self._real_obj.forward(**args)  # type: ignore
-
+        # mypy cannot infer that the class has this method
+        res = self._callable(**args)  # type: ignore
         if len(self._outputs.get_params()) > 1:
             for idx, param in enumerate(self._outputs.get_params()):
                 self._outputs.set_param(param, res[idx])
@@ -325,8 +240,8 @@ def _component_nn_factory(name: str, callable_to_wrap: type, comp_globals: Dict[
 
         """
         inputs = Params()
-        # mypy cannot infer that the class has a forward method
-        sign: inspect.Signature = inspect.signature(callable_to_wrap.forward)  # type: ignore
+        # NOTE: callable_forward needs to be predefined
+        sign: inspect.Signature = inspect.signature(callable_forward)
         for param in sign.parameters.values():
             if param.name == "self":
                 # skip the self parameter
@@ -349,8 +264,8 @@ def _component_nn_factory(name: str, callable_to_wrap: type, comp_globals: Dict[
                 return issubclass(obj, tuple) and hasattr(obj, '_asdict') and hasattr(obj, '_fields')
             return False
         outputs = Params()
-        # mypy cannot infer that the class has a forward method
-        sign: inspect.Signature = inspect.signature(callable_to_wrap.forward)  # type: ignore
+        # NOTE: callable_forward needs to be predefined
+        sign: inspect.Signature = inspect.signature(callable_forward)
         if isinstance_namedtuple(sign.return_annotation):
             # variable number of outputs
             for k, v in sign.return_annotation._field_defaults.items():
@@ -365,26 +280,37 @@ def _component_nn_factory(name: str, callable_to_wrap: type, comp_globals: Dict[
                 outputs.declare("out", sign.return_annotation)
         return outputs
 
-    # convert signature parameters into a set of params
-    params: Dict[str, str] = _get_params(name, comp_globals)
-
-    # create an string containing all the parameters for the __init__ method as if they were written by hand
-    str_params_def, str_params = _get_params_as_def(params)
-
-    # add the NoneType type to the globals.
-    # NOTE: This type is returned by inspect.signature but it does not exist
-    comp_globals['NoneType'] = NoneType
-
-    # template for the class to be created
-    str_params_def = f"self, name: str, {str_params_def}"  # add the name parameter required by teh component
+    # 3. create the component class
+    # -----------------------------
+    # define the name of hte component class
     str_name = name.replace(".", "___")
-    func = (f"class {str_name}(Component):\n"
-            f"    real_cls = {callable_to_wrap.__module__}.{callable_to_wrap.__name__}\n"
-            f"    def __init__({str_params_def}) -> None:\n"
-            f"        super().__init__(name)\n"
-            f"        self._real_obj = {callable_to_wrap.__module__}.{callable_to_wrap.__name__}({str_params})\n")
-    code = compile(func, comp_globals["__file__"], "exec")
-    eval(code, comp_globals)
+    # create the class
+    if inspect.isfunction(callable_to_wrap) or inspect.isbuiltin(callable_to_wrap):
+        # 1. define the class template
+        func = (f"class {str_name}(Component):\n"
+                f"    def __init__(self, name: str) -> None:\n"
+                f"        super().__init__(name)\n"
+                f"        self._callable = callable_forward\n")
+        # 2. compile and change the keyword "callable_forward" for the real function to be run
+        code = compile(func, comp_globals["__file__"], "exec")
+        eval(code, {"callable_forward": callable_forward}, comp_globals)
+    else:
+        # In the case of an nn.Module we need to dinamically assign the params to the __init__ method and
+        # create the original object.
+        # 1. Write the parameters of the __init__ method and the call to the forward method
+        params: Dict[str, str] = _get_params(name, comp_globals)
+        str_params_def, str_params = _get_params_as_def(params)
+
+        # 2. write the template for the component
+        str_params_def = f"self, name: str, {str_params_def}"  # add the name parameter required by the component
+        func = (f"class {str_name}(Component):\n"
+                f"    def __init__({str_params_def}) -> None:\n"
+                f"        super().__init__(name)\n"
+                f"        self._real_obj = {name}({str_params})\n"
+                f"        self._callable = self._real_obj.forward\n")
+        # 3. compile the code and add the methods to the component class
+        code = compile(func, comp_globals["__file__"], "exec")
+        eval(code, comp_globals)
     comp_globals[str_name].forward = forward
     comp_globals[str_name].register_inputs = register_inputs
     comp_globals[str_name].register_outputs = register_outputs
