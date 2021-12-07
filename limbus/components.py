@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 #     {"module.function": {"params": {"input0": "typing0", "input1": "typing1",...},
 #                          "returns": {"output0": "typing0"}}
 # NOTE: second way also accepts typing ans in the third way.
-lst_components: List[ComponentBuilder] = [
+lst_components: List[ComponentDefinition] = [
     {"kornia.enhance.image_histogram2d": {"returns": ["out", "out2"]}},  # we already know the types
     {"kornia.color.rgb_to_hls": {"returns": "torch.Tensor"}},
     {"kornia.color.hls_to_rgb": {}},
