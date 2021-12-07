@@ -10,6 +10,10 @@ import torch.nn as nn
 from limbus.core import Component, ComponentState, Params, NoValue
 
 
+# this globals must be init before running anything!!!
+# they are init from the module where the components will be added.
+COMP_GLOBALS: Dict[str, Any] = {}
+
 # the signature obtained from inspect.signature changes Optional to NoneType
 NoneType = type(None)
 
@@ -24,35 +28,35 @@ class ExtraParams(TypedDict, total=False):
 ComponentDefinition = Dict[str, ExtraParams]
 
 
-def _add_modules_to_globals(comp_globals: Dict[str, Any], modules: List[str]) -> None:
+def _add_modules_to_globals(modules: List[str]) -> None:
     """Add the modules in the list to the globals where the component will be defined."""
     for module in modules:
         if module.find(".") != -1:
             module = module[0: module.find(".")]
-        if module not in comp_globals:
-            comp_globals[module] = importlib.import_module(module)
+        if module not in COMP_GLOBALS:
+            COMP_GLOBALS[module] = importlib.import_module(module)
 
 
-def _get_annotation(annotation: Any, comp_globals: Dict[str, Any]) -> str:
+def _get_annotation(annotation: Any) -> str:
     """Get the string representation of the type of a parameter and add the module of the type to the globals."""
     # if it is a standard type...
     if typeguard.isclass(annotation):
         # add the module where the type is defined to ensure it is accesible.
-        _add_modules_to_globals(comp_globals, [annotation.__module__])
+        _add_modules_to_globals([annotation.__module__])
         return f"{annotation.__module__}.{annotation.__name__}"
     # else we assume it is a typing expresion...
     else:
         # TODO: check if inside the typing expression the base types are always defined within module
-        _add_modules_to_globals(comp_globals, ["typing"])
+        _add_modules_to_globals(["typing"])
         return str(annotation)
 
 
-def _get_params(name: str, comp_globals: Dict[str, Any]) -> Dict[str, str]:
+def _get_params(name: str) -> Dict[str, str]:
     params: Dict[str, str] = {}
-    _add_modules_to_globals(comp_globals, ["inspect"])
-    sign = eval(f"inspect.signature({name})", comp_globals)
+    _add_modules_to_globals(["inspect"])
+    sign = eval(f"inspect.signature({name})", COMP_GLOBALS)
     for param in sign.parameters.values():
-        params[param.name] = _get_annotation(param.annotation, comp_globals)
+        params[param.name] = _get_annotation(param.annotation)
         # if there is a default value, we add it
         if param.default is not inspect.Parameter.empty:
             default: Any = param.default
@@ -82,8 +86,7 @@ def _get_params_as_def(params: Dict[str, str]) -> Tuple[str, str]:
 
 def _build_returns(returns: Union[str, Dict[str, str], List[str]],
                    tp: Optional[str],
-                   name: Optional[str],
-                   comp_globals: Dict[str, Any]) -> str:
+                   name: Optional[str]) -> str:
     """Build the return of the component based on the signature of the callable.
 
     Warning: If we force any return type and it is wrong we are not raising an error!!!
@@ -96,7 +99,6 @@ def _build_returns(returns: Union[str, Dict[str, str], List[str]],
             - Dict[str, str] to force the name and the type of the output parameter of the callable
         tp: name of the namedtuple to be returned (required if returns != str).
         name: name of the callable (required if returns != str).
-        comp_globals: globals of the module where the component will be defined.
 
     Returns:
         str denoting the build return type
@@ -105,30 +107,29 @@ def _build_returns(returns: Union[str, Dict[str, str], List[str]],
     if isinstance(returns, str):
         # the return type is defined in the string
         if returns == "":
-            returns = eval(f"inspect.signature({name}).return_annotation", comp_globals)
-        return _get_annotation(returns, comp_globals)
+            returns = eval(f"inspect.signature({name}).return_annotation", COMP_GLOBALS)
+        return _get_annotation(returns)
     else:
         # the return type will a namedtuple
         assert tp is not None
         assert name is not None
         if isinstance(returns, list):
-            _add_modules_to_globals(comp_globals, ["collections", "inspect"])
+            _add_modules_to_globals(["collections", "inspect"])
             named_tpl = (f"collections.namedtuple('{tp}', {returns},"
                          f"defaults=inspect.signature({name}).return_annotation.__args__)")
         else:
-            _add_modules_to_globals(comp_globals, ["collections"])
+            _add_modules_to_globals(["collections"])
             named_tpl = (f"collections.namedtuple('{tp}', {returns}.keys(),"
                          f"defaults=list(map(eval, {returns}.values())))")
         # the new type must be in the globals to be used
-        comp_globals[tp] = eval(named_tpl, comp_globals)
+        COMP_GLOBALS[tp] = eval(named_tpl, COMP_GLOBALS)
         return tp
 
 
-def register_components(comp_globals: Dict[str, Any], lst_components: List[ComponentDefinition]) -> None:
+def register_components(lst_components: List[ComponentDefinition]) -> None:
     """Register all the components of a list of components.
 
     Args:
-        comp_globals: globals() of the module where the components will be defined.
         lst_components: List of components to register.
 
     """
@@ -141,12 +142,12 @@ def register_components(comp_globals: Dict[str, Any], lst_components: List[Compo
         returns: Union[str, Dict[str, str], List[str]] = extras.get("returns", "")
 
         # add the base module in "name" to the globals if it is not there
-        _add_modules_to_globals(comp_globals, [name])
+        _add_modules_to_globals([name])
 
         # if it is a class we directly try to create the component
-        fn_name: Union[Callable, type] = eval(name, comp_globals)
+        fn_name: Union[Callable, type] = eval(name, COMP_GLOBALS)
         if inspect.isclass(fn_name):
-            component_factory(name, fn_name, comp_globals)
+            component_factory(name, fn_name)
         # else we create a wrapper that will be used to create the component. We need that wrapper to deal
         # with the pytorch functions that do not have typing.
         else:
@@ -157,9 +158,9 @@ def register_components(comp_globals: Dict[str, Any], lst_components: List[Compo
 
             # if params are not defined, they are obtained from the signature of the callable
             if not params:
-                params = _get_params(name, comp_globals)
+                params = _get_params(name)
 
-            return_type: Union[str, NamedTuple] = _build_returns(returns, tp, name, comp_globals)
+            return_type: Union[str, NamedTuple] = _build_returns(returns, tp, name)
 
             # create wrapping code for the callable
             # -------------------------------------
@@ -172,9 +173,12 @@ def register_components(comp_globals: Dict[str, Any], lst_components: List[Compo
             str_params_def, str_params = _get_params_as_def(params)
             # define and compile the code of the wrapped callable
             func = f"def {str_name}({str_params_def}) -> {return_type}:\n    return real_func({str_params})\n"
-            code = compile(func, comp_globals["__file__"], "exec")
-            eval(code, {"real_func": fn_name}, comp_globals)
+            code = compile(func, COMP_GLOBALS["__file__"], "exec")
+            eval(code, {"real_func": fn_name}, COMP_GLOBALS)
             # create the component from the callable
+            component_factory(name, COMP_GLOBALS[str_name])
+
+
 def register_component(cls) -> None:
     """Define a decorator to register a component.
 
@@ -205,18 +209,17 @@ def register_component(cls) -> None:
 
 
 # define the factory function to create components automatically
-def component_factory(name: str, callable_to_wrap: Union[Callable, type], comp_globals: Dict[str, Any]) -> None:
+def component_factory(name: str, callable_to_wrap: Union[Callable, type]) -> None:
     """Generate a Component class for a given callable/nn.Module and add it to the globals.
 
     Args:
         name: name of the function to be wrapped as a component.
         callable_to_wrap: callable to be wrapped as a component.
-        comp_globals: globals() of the module where the components will be defined.
 
     """
     # add the NoneType type to the globals.
     # NOTE: This type is returned by inspect.signature but it does not exist
-    comp_globals['NoneType'] = NoneType
+    COMP_GLOBALS['NoneType'] = NoneType
 
     # ATTENTION: In this function "callable_forward" var is used as pointer to change
     # the job done inside the new component class. The register_inputs() and register_outputs() methods use directly
@@ -318,13 +321,13 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], comp_g
                 f"        super().__init__(name)\n"
                 f"        self._callable = callable_forward\n")
         # 2. compile and change the keyword "callable_forward" for the real function to be run
-        code = compile(func, comp_globals["__file__"], "exec")
-        eval(code, {"callable_forward": callable_forward}, comp_globals)
+        code = compile(func, COMP_GLOBALS["__file__"], "exec")
+        eval(code, {"callable_forward": callable_forward}, COMP_GLOBALS)
     else:
         # In the case of an nn.Module we need to dinamically assign the params to the __init__ method and
         # create the original object.
         # 1. Write the parameters of the __init__ method and the call to the forward method
-        params: Dict[str, str] = _get_params(name, comp_globals)
+        params: Dict[str, str] = _get_params(name)
         str_params_def, str_params = _get_params_as_def(params)
 
         # 2. write the template for the component
@@ -335,8 +338,8 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], comp_g
                 f"        self._real_obj = {name}({str_params})\n"
                 f"        self._callable = self._real_obj.forward\n")
         # 3. compile the code and add the methods to the component class
-        code = compile(func, comp_globals["__file__"], "exec")
-        eval(code, comp_globals)
-    comp_globals[str_name].forward = forward
-    comp_globals[str_name].register_inputs = register_inputs
-    comp_globals[str_name].register_outputs = register_outputs
+        code = compile(func, COMP_GLOBALS["__file__"], "exec")
+        eval(code, COMP_GLOBALS)
+    COMP_GLOBALS[str_name].forward = forward
+    COMP_GLOBALS[str_name].register_inputs = register_inputs
+    COMP_GLOBALS[str_name].register_outputs = register_outputs
