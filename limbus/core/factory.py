@@ -125,7 +125,7 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
                 p_annotation = params[param]
                 p_empty = p_annotation.find("=") == -1
                 if not p_empty:
-                    p_default = p_annotation[p_annotation.find("=")+1:]
+                    p_default = p_annotation[p_annotation.find("=") + 1:]
                     p_annotation = p_annotation[0: p_annotation.find("=")]
                 _import_if_it_is_possible([p_annotation])
                 # convert to the proper type the type and default value
@@ -140,7 +140,6 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
                 inputs.declare(p_name, p_annotation, p_default)
         return inputs
 
-
     def _helper_to_add_returns(outputs: Params, return_annotation: Any, name: Optional[List[str]] = None) -> None:
         if name is None:
             name = ["out"]
@@ -153,7 +152,6 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
         else:
             # single output case
             outputs.declare(f"{name[0]}", return_annotation)
-
 
     def register_outputs() -> Params:
         """Register the output params.
@@ -182,7 +180,7 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
                     outputs.declare(k, v)
             else:
                 _helper_to_add_returns(outputs, return_annotation)
-    
+
         #############################################################################################
         # Valid formats for teh "returns" variable:
         #    - "" if we want the default return of the callable
@@ -210,7 +208,7 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
                 return_annotation = f"typing.Tuple[{return_annotation}]"
             _helper_to_add_returns(outputs, eval(return_annotation, COMP_GLOBALS), ret_name)
         else:
-            raise TypeError(f"Invalid type definition for the output pins.")
+            raise TypeError("Invalid type definition for the output pins.")
         return outputs
 
     # 3. create the component class
