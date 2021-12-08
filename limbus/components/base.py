@@ -1,30 +1,30 @@
-"""Some predefined components."""
-from typing import Any, Callable, List, NamedTuple, Union, cast, Tuple, Dict, TypedDict, Optional, Literal, Sequence
-from collections import namedtuple
-from pathlib import Path
-import hashlib
-import logging
-import inspect
+"""Some predefined components.
 
-from matplotlib import pyplot as plt
+All the components are "saved" as classes in limbus.components, being the original module name used
+to create a clear name for the component.
+E.g.:
+limbus.components.base.ImageReader -> limbus.components.limbus___ImageReader
+torch.unbind                       -> limbus.components.torch___unbind
+kornia.color.rgb_to_hls            -> limbus.components.kornia___color___rgb_to_hls
+
+The components automatically created are always saved in the limbus.components module using ___ to
+denote the original module.
+"""
+from typing import Any, List
+from pathlib import Path
+import logging
+
 import numpy as np
 import PIL
 import torch
 import visdom
 import kornia
 
-from limbus.core import Component, ComponentState, Params, component_factory
+from limbus.core import Component, ComponentState, Params, register_components, register_component, ComponentDefinition
+
 
 log = logging.getLogger(__name__)
 
-
-class ExtraParams(TypedDict, total=False):
-    """Typing for the arguments."""
-    params: Dict[str, str]
-    returns: Union[str, Dict[str, str], List[str]]
-
-
-ComponentBuilder = Dict[str, ExtraParams]
 
 # ways to declare a component:
 # 1.- Params can be obtained with inspect and 1 output:
@@ -35,7 +35,29 @@ ComponentBuilder = Dict[str, ExtraParams]
 #     {"module.function": {"params": {"input0": "typing0", "input1": "typing1",...},
 #                          "returns": {"output0": "typing0"}}
 # NOTE: second way also accepts typing ans in the third way.
-lst_components: List[ComponentBuilder] = [
+lst_components: List[ComponentDefinition] = [
+    {"kornia.augmentation.RandomCrop": {}},
+    {"kornia.geometry.transform.warp_perspective": {}},
+    {"kornia.feature.LoFTR": {}},
+    {"kornia.contrib.ImageStitcher": {}},
+    {"kornia.contrib.histogram_matching": {}},
+    {"kornia.geometry.transform.center_crop": {}},
+    {"kornia.geometry.transform.crop_and_resize": {}},
+    {"kornia.geometry.transform.Scale": {}},
+    {"kornia.geometry.transform.Rotate": {}},
+    {"kornia.geometry.transform.Translate": {}},
+    {"kornia.geometry.transform.Shear": {}},
+    {"kornia.geometry.transform.PyrDown": {}},
+    {"kornia.geometry.transform.PyrUp": {}},
+    {"kornia.geometry.transform.ScalePyramid": {}},
+    {"kornia.geometry.transform.Hflip": {}},
+    {"kornia.geometry.transform.Vflip": {}},
+    {"kornia.geometry.transform.Rot180": {}},
+    {"kornia.geometry.transform.Resize": {}},
+    {"kornia.geometry.transform.Rescale": {}},
+    {"kornia.geometry.transform.Affine": {}},
+    {"kornia.geometry.transform.HomographyWarper": {}},
+    {"kornia.enhance.normalize_min_max": {}},
     {"kornia.enhance.image_histogram2d": {"returns": ["out", "out2"]}},  # we already know the types
     {"kornia.color.rgb_to_hls": {"returns": "torch.Tensor"}},
     {"kornia.color.hls_to_rgb": {}},
@@ -44,14 +66,14 @@ lst_components: List[ComponentBuilder] = [
                       "returns": {"out": "torch.Tensor"}
                       }  # we do not know the types
      },
-    {"torch.unbind": {"params": {"input": "torch.Tensor", "dim": "int"},
-                      "returns": "Sequence[torch.Tensor]"}
+    {"torch.unbind": {"params": {"input": "torch.Tensor", "dim": "int = 0"},
+                      "returns": "typing.Sequence[torch.Tensor]"}
      },
-    {"torch.stack": {"params": {"input": "Sequence[torch.Tensor]", "dim": "int"},
+    {"torch.stack": {"params": {"input": "typing.Sequence[torch.Tensor]", "dim": "int = 0"},
                      "returns": {"out": "torch.Tensor"}
                      }
      },
-    {"torch.cat": {"params": {"input": "Sequence[torch.Tensor]", "dim": "int"},
+    {"torch.cat": {"params": {"input": "typing.Sequence[torch.Tensor]", "dim": "int"},
                    "returns": {"out": "torch.Tensor"}
                    }
      },
@@ -59,56 +81,16 @@ lst_components: List[ComponentBuilder] = [
                          "returns": {"out": "torch.Tensor"}
                          }
      },
-    {"torch.squeeze": {"params": {"input": "torch.Tensor", "dim": "Optional[int]"},
+    {"torch.squeeze": {"params": {"input": "torch.Tensor", "dim": "typing.Optional[int]"},
                        "returns": {"out": "torch.Tensor"}
                        }
      }]
 
-
-# TODO: add type checking when it is possible, validate that the number of input/outputs make sense...
-def _create_ret_namedtuple(returns: Union[Dict[str, str], List[str]], tp: str, name: str) -> str:
-    if isinstance(returns, list):
-        named_tpl = (f"namedtuple('{tp}', returns,"
-                     f"defaults=inspect.signature({name}).return_annotation.__args__)")
-    else:
-        named_tpl = f"namedtuple('{tp}', returns.keys(), defaults=list(map(eval, returns.values())))"
-    globals()[tp] = eval(named_tpl)
-    return tp
+# automatic register of all the components in the list of components
+register_components(lst_components)
 
 
-cmp: ComponentBuilder
-for cmp in lst_components:
-    for name, extras in cmp.items():
-        fn_name = eval(name)
-        str_name = name.replace(".", "___")
-        params: Optional[Dict[str, str]] = extras.get("params", {})
-        returns: Union[str, Dict[str, str], List[str]] = extras.get("returns", "")
-        tp: str = f"{str_name}_ret"
-        if not params:
-            if returns:
-                # NOTE: we are overriding the type of the return!!!
-                if not isinstance(returns, str):
-                    returns = _create_ret_namedtuple(returns, tp, name)
-                fn_name.__annotations__["return"] = eval(returns)
-            callable_function = fn_name
-        else:
-            if not isinstance(returns, str):
-                # create namedtuple for the return values. THe default value denotes the type
-                returns = _create_ret_namedtuple(returns, tp, name)
-            # create wrapping function (e.g. torch methods do not have annotated typing)
-            # NOTE: there is a trick to have acces to the name of the output parameters. The function signature
-            # requires a namedtuple, however the return of the function is not a namedtuple.
-            # Returning a namedtuple here is complex.
-            str_params = str(params).replace("'", "").replace("{", "").replace("}", "")
-            str_ret_params = str(tuple(params.keys())).replace("'", "")
-            func = f"def {str_name}({str_params}) -> {returns}:\n    return real_func{str_ret_params}\n"
-            code = compile(func, __file__, "exec")
-            eval(code, {"real_func": fn_name}, globals())
-            callable_function = globals()[str_name]
-
-        globals()[str_name] = component_factory(callable_function)
-
-
+@register_component
 class ImageReader(Component):
     """Component that holds a constant.
 
@@ -140,11 +122,11 @@ class ImageReader(Component):
             if self._idx >= len(self._value):
                 return ComponentState.STOPPED
             try:
+                self._idx += 1
                 images.append(
                     kornia.image_to_tensor(np.asarray(PIL.Image.open(str(self._value[self._idx]))))
                 )
                 batch_size += 1
-                self._idx += 1
             except:
                 # avoid crashing the whole pipeline when there is a corrupted image or non-image file
                 pass
@@ -155,6 +137,7 @@ class ImageReader(Component):
         return ComponentState.OK
 
 
+@register_component
 class ImageShow(Component):
     """Component to show the input image."""
     def __init__(self, name: str):
@@ -195,6 +178,7 @@ class ImageShow(Component):
         pass
 
 
+@register_component
 class Constant(Component):
     """Component that holds a constant."""
     def __init__(self, name: str, value: Any):
@@ -213,6 +197,7 @@ class Constant(Component):
         return ComponentState.OK
 
 
+@register_component
 class Printer(Component):
     """Component to print the input in the console."""
     def __init__(self, name: str):
@@ -231,6 +216,7 @@ class Printer(Component):
 
 
 # Example of a simple component created from the API
+@register_component
 class Adder(Component):
     """Component to add two inputs and output the result."""
     def __init__(self, name: str):
@@ -257,6 +243,7 @@ class Adder(Component):
 
 
 # temporal classes while we solve pending issues. TODO: allow components as parameters
+@register_component
 class ImageStitcher(Component):
     """Component to stitch images together."""
     def __init__(self, name: str, estimator: str = 'ransac', blending_method: str = 'naive'):
@@ -282,6 +269,7 @@ class ImageStitcher(Component):
         return ComponentState.OK
 
 
+@register_component
 class ImageRegistrator(Component):
     """Component to register images."""
     def __init__(self, name: str):
