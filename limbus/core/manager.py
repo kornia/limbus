@@ -103,7 +103,7 @@ class ComponentsManager(nn.Module):
         self.nodes[_to.name].inputs[to_name].append(from_link)
 
     def _traverse(self, node_name) -> None:
-        # remainder about teh pins:
+        # remainder about the pins:
         # - they can be entirely assigned to another pin (then the type is _Link)
         # - they can be assigned by slices (then the type is Dict[int, _Link])
         out_pins: Dict[Any, List[Union[Dict[int, _Link], _Link]]] = self.nodes[node_name].outputs
@@ -125,7 +125,7 @@ class ComponentsManager(nn.Module):
                         if isinstance(out_src_link, dict):
                             # in the traverse we do not care about the indexes
                             out_src_link = list(out_src_link.values())[0]
-                        # if not all the source nodes are already in teh seq, we need to add them before
+                        # if not all the source nodes are already in the seq, we need to add them before
                         if out_src_link.node not in self._seq:
                             # jump to the next link in the list
                             next_inp_link = True

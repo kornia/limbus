@@ -223,7 +223,7 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type]) -> Non
 
     # ATTENTION: In this function "callable_forward" var is used as pointer to change
     # the job done inside the new component class. The register_inputs() and register_outputs() methods use directly
-    # this var to get teh input and output params. The forward() is a bit trickier since the self._callable_forward
+    # this var to get the input and output params. The forward() is a bit trickier since the self._callable_forward
     # var is assigned inside the template of the component class.
     callable_forward: Union[Callable, type]
 
