@@ -17,6 +17,8 @@ To create components using the automatic approach you need to create a `yml` fil
 
     This is useful in the next cases:
     - the function signature cannot be obtained
+    - when we want to force a typing to the inputs arguments
+        - note that the typings must be compatible with the original ones.
     - when not all the inputs should be exposed (in this case the hidden args must have by default values)
     - we want to force some args to default values
 
@@ -38,8 +40,10 @@ To create components using the automatic approach you need to create a `yml` fil
 
     This is useful in the next cases:
     - the function signature cannot be obtained
-    - when we want to assing a name for the out pins in the component
+    - when we want to assign a name for the out pins in the component.
+        - This can only be done when the number of outputs is fixed.
     - when we want to force a typing to the output arguments
+        - note that the typings must be compatible with the original ones.
 
     E.g. defining the entire signature:
     ```yml
@@ -74,3 +78,5 @@ To create components using the automatic approach you need to create a `yml` fil
     ```
 
 **NOTE**: sometimes to write typing expresions special caharacters are required (e.g. `[]`) in that case remember to add `""` (e.g. `"typing.Optional[int]"`).
+
+**NOTE 2**: all the non builtin types must be written with the origin modules. E.g. `Tensor` is incorrect, it must be written as `torch.Tensor`.
