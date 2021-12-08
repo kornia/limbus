@@ -334,8 +334,8 @@ def register_components_from_yml(file_name: str) -> None:
     with open(file_name, "r") as stream:
         try:
             defs = yaml.safe_load(stream)
-        except yaml.YAMLError as exc:
-            log.error("The list of component definitions for pytorch couldn't be loaded.", exc_info = 1)
+        except yaml.YAMLError:
+            log.error("The list of component definitions for pytorch couldn't be loaded.", exc_info=True)
 
     # convert dict into a list
     lst: List[ComponentDefinition] = []
