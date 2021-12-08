@@ -34,12 +34,13 @@ class ExtraParams(TypedDict, total=False):
 ComponentDefinition = Dict[str, ExtraParams]
 
 
-def component_factory(name: str, callable_to_wrap: Union[Callable, type]) -> None:
+def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra: ExtraParams) -> None:
     """Generate a Component class for a given callable/nn.Module and add it to the globals.
 
     Args:
         name: name of the function to be wrapped as a component.
         callable_to_wrap: callable to be wrapped as a component.
+        extra: extra parameters used to create the component.
 
     """
     # add the NoneType type to the globals.
@@ -54,15 +55,17 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type]) -> Non
 
     # 1. define those vars
     # --------------------
+    # torch functions are builtin and their signatures mast be imported in a special way
+    is_torch: bool = (name[0: name.find(".")] == "torch")
     # We need to distinguish between functions and nn.Modules.
-    if inspect.isfunction(callable_to_wrap) or inspect.isbuiltin(callable_to_wrap):  # torch functions are builtin
+    if inspect.isfunction(callable_to_wrap) or (is_torch and inspect.isbuiltin(callable_to_wrap)):
         # in this case the "callable_forward" is directly the callable
         callable_forward = callable_to_wrap
     elif isinstance(callable_to_wrap, type) and nn.Module in inspect.getmro(callable_to_wrap):
         # in this case "callable_forward" refers to the forward method in the original nn.Module
         callable_forward = callable_to_wrap.forward  # type: ignore  # mypy don't know about the forward method
     else:
-        raise TypeError(f"{callable_to_wrap} must be a function or an nn.Module.")
+        raise TypeError(f"{callable_to_wrap} must be a function, a torch builtin or an nn.Module.")
 
     # 2. define the forward(), register_inputs() and register_outputs() methods
     # -------------------------------------------------------------------------
@@ -86,6 +89,13 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type]) -> Non
             self._outputs.set_param(param, res)
         return ComponentState.OK
 
+    def _import_if_it_is_possible(modules: List[str]) -> None:
+        # if there is a module to import, let's import it
+        try:
+            _add_modules_to_globals(modules)
+        except:
+            pass
+
     def register_inputs() -> Params:
         """Register the inputs params.
 
@@ -94,17 +104,56 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type]) -> Non
 
         """
         inputs = Params()
-        # NOTE: callable_forward needs to be predefined
-        sign: inspect.Signature = inspect.signature(callable_forward)
-        for param in sign.parameters.values():
-            if param.name == "self":
-                # skip the self parameter
-                continue
-            if param.default is param.empty:
-                inputs.declare(param.name, param.annotation)
+        params: Union[Dict[str, str], List[inspect.Parameter]] = extra.get("params", {})
+        if not params:
+            # NOTE: callable_forward needs to be predefined
+            # if there are no params in extra, we use the signature of the function
+            sign: inspect.Signature = inspect.signature(callable_forward)
+            params = list(sign.parameters.values())
+        else:
+            # just in case it is not imported and there are typing types in the params
+            _add_modules_to_globals(["typing"])
+        for param in params:
+            if isinstance(param, inspect.Parameter):
+                p_name: str = param.name
+                p_annotation: Any = param.annotation
+                p_default: Any = param.default
+                p_empty: bool = p_default is param.empty
             else:
-                inputs.declare(param.name, param.annotation, param.default)
+                assert isinstance(params, dict)
+                p_name = param
+                p_annotation = params[param]
+                p_empty = p_annotation.find("=") == -1
+                if not p_empty:
+                    p_default = p_annotation[p_annotation.find("=")+1:]
+                    p_annotation = p_annotation[0: p_annotation.find("=")]
+                _import_if_it_is_possible([p_annotation])
+                # convert to the proper type the type and default value
+                p_default = eval(p_default, COMP_GLOBALS) if not p_empty else None
+                p_annotation = eval(p_annotation, COMP_GLOBALS)
+            # skip the self parameter
+            if p_name == "self":
+                continue
+            if p_empty:
+                inputs.declare(p_name, p_annotation)
+            else:
+                inputs.declare(p_name, p_annotation, p_default)
         return inputs
+
+
+    def _helper_to_add_returns(outputs: Params, return_annotation: Any, name: Optional[List[str]] = None) -> None:
+        if name is None:
+            name = ["out"]
+        if not typeguard.isclass(return_annotation) and return_annotation._name == "Tuple":
+            # variable number of outputs
+            # NOTE: if there are several names, len(name) and the number of returns must coincide!!!
+            for idx, arg in enumerate(return_annotation.__args__):
+                out_name = f"{name[0]}{idx}" if len(name) == 1 else f"{name[idx]}"
+                outputs.declare(out_name, arg)
+        else:
+            # single output case
+            outputs.declare(f"{name[0]}", return_annotation)
+
 
     def register_outputs() -> Params:
         """Register the output params.
@@ -118,20 +167,50 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type]) -> Non
                 return issubclass(obj, tuple) and hasattr(obj, '_asdict') and hasattr(obj, '_fields')
             return False
         outputs = Params()
-        # NOTE: callable_forward needs to be predefined
-        sign: inspect.Signature = inspect.signature(callable_forward)
-        if isinstance_namedtuple(sign.return_annotation):
-            # variable number of outputs
-            for k, v in sign.return_annotation._field_defaults.items():
-                outputs.declare(k, v)
-        else:
-            if not typeguard.isclass(sign.return_annotation) and sign.return_annotation._name == "Tuple":
+        returns: Union[str, Dict[str, str], List[str]] = extra.get("returns", {})
+        # if the returns are a list we still need the signature of the function
+        if not returns or isinstance(returns, list):
+            # NOTE: callable_forward needs to be predefined
+            # if there are no returns in extra, we use the signature to get them
+            sign: inspect.Signature = inspect.signature(callable_forward)
+            return_annotation: Any = sign.return_annotation
+        # get returns only using the signature
+        if not returns:
+            if isinstance_namedtuple(return_annotation):
                 # variable number of outputs
-                for idx, arg in enumerate(sign.return_annotation.__args__):
-                    outputs.declare(f"out{idx}", arg)
+                for k, v in return_annotation._field_defaults.items():
+                    outputs.declare(k, v)
             else:
-                # single output case
-                outputs.declare("out", sign.return_annotation)
+                _helper_to_add_returns(outputs, return_annotation)
+    
+        #############################################################################################
+        # Valid formats for teh "returns" variable:
+        #    - "" if we want the default return of the callable
+        #    - "type" to force the return type of the callable
+        #    - List[str] to force the name of the output parameter of the callable
+        #    - Dict[str, str] to force the name and the type of the output parameter of the callable
+        #############################################################################################
+        # if returns is a string we only need to eval() it
+        elif isinstance(returns, str):
+            _import_if_it_is_possible([returns])
+            outputs.declare("out", eval(returns, COMP_GLOBALS))
+        # if returns is a list we need to rename the outputs with the names in the list
+        elif isinstance(returns, list):
+            _helper_to_add_returns(outputs, return_annotation, returns)
+        elif isinstance(returns, dict):
+            _add_modules_to_globals(["typing"])
+            ret_name: List[str] = []
+            return_annotation = ""
+            for key in returns:
+                ret_name.append(key)
+                _import_if_it_is_possible([returns[key]])
+                return_annotation += f"{returns[key]}, "
+            return_annotation = return_annotation[:-2]
+            if len(ret_name) > 1:
+                return_annotation = f"typing.Tuple[{return_annotation}]"
+            _helper_to_add_returns(outputs, eval(return_annotation, COMP_GLOBALS), ret_name)
+        else:
+            raise TypeError(f"Invalid type definition for the output pins.")
         return outputs
 
     # 3. create the component class
@@ -206,7 +285,7 @@ def _get_params(name: str) -> Dict[str, str]:
                 default = f"\"{param.default}\""
             elif type(param.default).__module__ != "builtins":
                 # in this case we concat the module to be able to retrieve the value.
-                # TODO: this trick is not gonan work always.
+                # TODO: this trick is not gonna work always.
                 default = f"{type(param.default).__module__}.{param.default}"
             params[param.name] += f" = {default}"
     return params
@@ -226,48 +305,6 @@ def _get_params_as_def(params: Dict[str, str]) -> Tuple[str, str]:
     return str_params_def, str_params
 
 
-def _build_returns(returns: Union[str, Dict[str, str], List[str]],
-                   tp: Optional[str],
-                   name: Optional[str]) -> str:
-    """Build the return of the component based on the signature of the callable.
-
-    Warning: If we force any return type and it is wrong we are not raising an error!!!
-
-    Args:
-        returns: type of the return of the component. Can be defined as:
-            - "" if we want the default return of the callable
-            - "type" to force the return type of the callable
-            - List[str] to force the name of the output parameter of the callable
-            - Dict[str, str] to force the name and the type of the output parameter of the callable
-        tp: name of the namedtuple to be returned (required if returns != str).
-        name: name of the callable (required if returns != str).
-
-    Returns:
-        str denoting the build return type
-
-    """
-    if isinstance(returns, str):
-        # the return type is defined in the string
-        if returns == "":
-            returns = eval(f"inspect.signature({name}).return_annotation", COMP_GLOBALS)
-        return _get_annotation(returns)
-    else:
-        # the return type will a namedtuple
-        assert tp is not None
-        assert name is not None
-        if isinstance(returns, list):
-            _add_modules_to_globals(["collections", "inspect"])
-            named_tpl = (f"collections.namedtuple('{tp}', {returns},"
-                         f"defaults=inspect.signature({name}).return_annotation.__args__)")
-        else:
-            _add_modules_to_globals(["collections"])
-            named_tpl = (f"collections.namedtuple('{tp}', {returns}.keys(),"
-                         f"defaults=list(map(eval, {returns}.values())))")
-        # the new type must be in the globals to be used
-        COMP_GLOBALS[tp] = eval(named_tpl, COMP_GLOBALS)
-        return tp
-
-
 def register_components(lst_components: List[ComponentDefinition]) -> None:
     """Register all the components of a list of components.
 
@@ -281,45 +318,11 @@ def register_components(lst_components: List[ComponentDefinition]) -> None:
         name: str = list(cmp.keys())[0]
         elem = list(cmp.values())[0]
         extras: ExtraParams = elem if elem is not None else {}
-        params: Dict[str, str] = extras.get("params", {})
-        returns: Union[str, Dict[str, str], List[str]] = extras.get("returns", "")
 
         # add the base module in "name" to the globals if it is not there
         _add_modules_to_globals([name])
-
-        # if it is a class we directly try to create the component
-        fn_name: Union[Callable, type] = eval(name, COMP_GLOBALS)
-        if inspect.isclass(fn_name):
-            component_factory(name, fn_name)
-        # else we create a wrapper that will be used to create the component. We need that wrapper to deal
-        # with the pytorch functions that do not have typing.
-        else:
-            # the name of the component will be the original callable name but replacing . by ___
-            str_name = name.replace(".", "___")
-            # the component return is a namedtuple with the same name + _ret
-            tp: str = f"{str_name}_ret"
-
-            # if params are not defined, they are obtained from the signature of the callable
-            if not params:
-                params = _get_params(name)
-
-            return_type: Union[str, NamedTuple] = _build_returns(returns, tp, name)
-
-            # create wrapping code for the callable
-            # -------------------------------------
-            # WARNING: the wrapping code specifies a return type that can be different from the return type of
-            # the callable. However, both must be compatible. If the return type of the callable is not compatible
-            # an error will be raised in execution time. To be able to assign names to the outputs we needed to convert
-            # them into a namedtuple.
-
-            # convert the params to a string
-            str_params_def, str_params = _get_params_as_def(params)
-            # define and compile the code of the wrapped callable
-            func = f"def {str_name}({str_params_def}) -> {return_type}:\n    return real_func({str_params})\n"
-            code = compile(func, COMP_GLOBALS["__file__"], "exec")
-            eval(code, {"real_func": fn_name}, COMP_GLOBALS)
-            # create the component from the callable
-            component_factory(name, COMP_GLOBALS[str_name])
+        # create and add the component to the registry
+        component_factory(name, eval(name, COMP_GLOBALS), extras)
 
 
 def register_components_from_yml(file_name: str) -> None:
