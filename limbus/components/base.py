@@ -20,74 +20,10 @@ import torch
 import visdom
 import kornia
 
-from limbus.core import Component, ComponentState, Params, register_components, register_component, ComponentDefinition
+from limbus.core import Component, ComponentState, Params, register_component
 
 
 log = logging.getLogger(__name__)
-
-
-# ways to declare a component:
-# 1.- Params can be obtained with inspect and 1 output:
-#     {"module.function": {}},
-# 2.- Params can be obtained with inspect and several already typed outputs in a tuple:
-#     {"module.function": {"returns": ["output_name_1", "output_name_2"]}},
-# 3.- Params and returns can NOT be obtained with inspect:
-#     {"module.function": {"params": {"input0": "typing0", "input1": "typing1",...},
-#                          "returns": {"output0": "typing0"}}
-# NOTE: second way also accepts typing ans in the third way.
-lst_components: List[ComponentDefinition] = [
-    {"kornia.augmentation.RandomCrop": {}},
-    {"kornia.geometry.transform.warp_perspective": {}},
-    {"kornia.feature.LoFTR": {}},
-    {"kornia.contrib.ImageStitcher": {}},
-    {"kornia.contrib.histogram_matching": {}},
-    {"kornia.geometry.transform.center_crop": {}},
-    {"kornia.geometry.transform.crop_and_resize": {}},
-    {"kornia.geometry.transform.Scale": {}},
-    {"kornia.geometry.transform.Rotate": {}},
-    {"kornia.geometry.transform.Translate": {}},
-    {"kornia.geometry.transform.Shear": {}},
-    {"kornia.geometry.transform.PyrDown": {}},
-    {"kornia.geometry.transform.PyrUp": {}},
-    {"kornia.geometry.transform.ScalePyramid": {}},
-    {"kornia.geometry.transform.Hflip": {}},
-    {"kornia.geometry.transform.Vflip": {}},
-    {"kornia.geometry.transform.Rot180": {}},
-    {"kornia.geometry.transform.Resize": {}},
-    {"kornia.geometry.transform.Rescale": {}},
-    {"kornia.geometry.transform.Affine": {}},
-    {"kornia.geometry.transform.HomographyWarper": {}},
-    {"kornia.enhance.normalize_min_max": {}},
-    {"kornia.enhance.image_histogram2d": {"returns": ["out", "out2"]}},  # we already know the types
-    {"kornia.color.rgb_to_hls": {"returns": "torch.Tensor"}},
-    {"kornia.color.hls_to_rgb": {}},
-    {"kornia.enhance.equalize_clahe": {}},
-    {"torch.select": {"params": {"input": "torch.Tensor", "dim": "int", "index": "int"},
-                      "returns": {"out": "torch.Tensor"}
-                      }  # we do not know the types
-     },
-    {"torch.unbind": {"params": {"input": "torch.Tensor", "dim": "int = 0"},
-                      "returns": "typing.Sequence[torch.Tensor]"}
-     },
-    {"torch.stack": {"params": {"input": "typing.Sequence[torch.Tensor]", "dim": "int = 0"},
-                     "returns": {"out": "torch.Tensor"}
-                     }
-     },
-    {"torch.cat": {"params": {"input": "typing.Sequence[torch.Tensor]", "dim": "int"},
-                   "returns": {"out": "torch.Tensor"}
-                   }
-     },
-    {"torch.unsqueeze": {"params": {"input": "torch.Tensor", "dim": "int"},
-                         "returns": {"out": "torch.Tensor"}
-                         }
-     },
-    {"torch.squeeze": {"params": {"input": "torch.Tensor", "dim": "typing.Optional[int]"},
-                       "returns": {"out": "torch.Tensor"}
-                       }
-     }]
-
-# automatic register of all the components in the list of components
-register_components(lst_components)
 
 
 @register_component
