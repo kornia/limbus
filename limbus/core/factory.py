@@ -27,6 +27,7 @@ NoneType = type(None)
 # define ComponentDefinition which is the structure containing the required data to build components automatically
 class ExtraParams(TypedDict, total=False):
     """Typing for the arguments."""
+    init: Dict[str, str]
     params: Dict[str, str]
     returns: Union[str, Dict[str, str], List[str]]
 
