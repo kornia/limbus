@@ -46,6 +46,8 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
     # add the NoneType type to the globals.
     # NOTE: This type is returned by inspect.signature but it does not exist
     COMP_GLOBALS['NoneType'] = NoneType
+    # add the typing module to the globals.
+    _add_modules_to_globals(["typing"])
 
     # ATTENTION: In this function "callable_forward" var is used as pointer to change
     # the job done inside the new component class. The register_inputs() and register_outputs() methods use directly
@@ -110,9 +112,6 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
             # if there are no params in extra, we use the signature of the function
             sign: inspect.Signature = inspect.signature(callable_forward)
             params = list(sign.parameters.values())
-        else:
-            # just in case it is not imported and there are typing types in the params
-            _add_modules_to_globals(["typing"])
         for param in params:
             if isinstance(param, inspect.Parameter):
                 p_name: str = param.name
@@ -196,7 +195,6 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
         elif isinstance(returns, list):
             _helper_to_add_returns(outputs, return_annotation, returns)
         elif isinstance(returns, dict):
-            _add_modules_to_globals(["typing"])
             ret_name: List[str] = []
             return_annotation = ""
             for key in returns:
@@ -229,8 +227,13 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
         # In the case of an nn.Module we need to dinamically assign the params to the __init__ method and
         # create the original object.
         # 1. Write the parameters of the __init__ method and the call to the forward method
-        params: Dict[str, str] = _get_params(name)
-        str_params_def, str_params = _get_params_as_def(params)
+        init_params: Dict[str, str] = extra.get("init", {})
+        if not init_params:
+            init_params = _get_params(name)
+        else:
+            for param in init_params:
+                _import_if_it_is_possible([init_params[param]])
+        str_params_def, str_params = _get_params_as_def(init_params)
 
         # 2. write the template for the component
         str_params_def = f"self, name: str, {str_params_def}"  # add the name parameter required by the component

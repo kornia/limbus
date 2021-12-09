@@ -77,6 +77,22 @@ To create components using the automatic approach you need to create a `yml` fil
     ...
     ```
 
+- *Writing the name and optionally the args of a `nn.Module`.*
+
+    This approach for `nn.Module`s works as the approach for functions but adding the posibility to provide the input args for the `__init__` function.
+    The `__init__` args are parametrized in the same way as the params for the functions.
+
+    In this use case the `params` and `returns` apply on the `forward()` method.
+
+    E.g.:
+    ```yml
+    kornia.augmentation.RandomCrop:
+        init: {size: "typing.Tuple[int, int]"}
+        params: {input: torch.Tensor}
+        returns: torch.Tensor
+    ```
+
+
 **NOTE**: sometimes to write typing expresions special caharacters are required (e.g. `[]`) in that case remember to add `""` (e.g. `"typing.Optional[int]"`).
 
 **NOTE 2**: all the non builtin types must be written with the origin modules. E.g. `Tensor` is incorrect, it must be written as `torch.Tensor`.

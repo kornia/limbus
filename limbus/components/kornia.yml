@@ -1,4 +1,7 @@
 kornia.augmentation.RandomCrop:
+  init: {size: "typing.Tuple[int, int]"}
+  params: {input: torch.Tensor}
+  returns: torch.Tensor
 kornia.geometry.transform.warp_perspective:
 kornia.feature.LoFTR:
 kornia.contrib.ImageStitcher:
