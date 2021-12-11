@@ -56,7 +56,6 @@ To create components using the automatic approach you need to create a `yml` fil
     ```yml
     torch.select:
         returns: [output_tensor]
-    
     ...
     ```
 
@@ -90,6 +89,20 @@ To create components using the automatic approach you need to create a `yml` fil
         init: {size: "typing.Tuple[int, int]"}
         params: {input: torch.Tensor}
         returns: torch.Tensor
+    ...
+    ```
+
+- *SPECIAL CASE for torch builtin functions:*
+
+    In these cases an extra section can be added to the component definition to detone which one of all the candidate signatures will be used to build the component.
+
+    NOTE: by default the signature index `idx` is 0.
+
+    E.g.:
+    ```yml
+    torch.select:
+        idx: 0
+    ...
     ```
 
 

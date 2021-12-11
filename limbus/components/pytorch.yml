@@ -3,8 +3,7 @@ torch.select:
   returns: {out: torch.Tensor}
 
 torch.unbind:
-  params: {input: torch.Tensor, dim: int = 0}
-  returns: "typing.Sequence[torch.Tensor]"
+  idx: 0
 
 torch.stack:
   params: {input: "typing.Sequence[torch.Tensor]", dim: int = 0}

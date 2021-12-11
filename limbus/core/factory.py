@@ -28,6 +28,7 @@ NoneType = type(None)
 # define ComponentDefinition which is the structure containing the required data to build components automatically
 class ExtraParams(TypedDict, total=False):
     """Typing for the arguments."""
+    idx: int  # signature idx if there are several signatures
     init: Dict[str, str]
     params: Dict[str, str]
     returns: Union[str, Dict[str, str], List[str]]
@@ -125,7 +126,8 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
         signs: Optional[List[inspect.Signature]] = (
             torch.fx.operator_schemas.get_signature_for_torch_op(callable_to_wrap))
         assert signs is not None, f"Something weird happened with {name}. It should have a signature."
-        callable_signature = signs[0]
+        sign_idx: int = extra.get("idx", 0)
+        callable_signature = signs[sign_idx]
     elif isinstance(callable_to_wrap, type) and nn.Module in inspect.getmro(callable_to_wrap):
         # in this case "callable_forward" refers to the forward method in the original nn.Module
         callable_forward = callable_to_wrap.forward  # type: ignore  # mypy don't know about the forward method
