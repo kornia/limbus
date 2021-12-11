@@ -7,6 +7,7 @@ import logging
 
 import yaml
 import typeguard
+import torch.fx
 import torch.nn as nn
 
 from limbus.core import Component, ComponentState, Params, NoValue
@@ -54,19 +55,27 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
     # the job done inside the new component class. The register_inputs() and register_outputs() methods use directly
     # this var to get the input and output params. The forward() is a bit trickier since the self._callable_forward
     # var is assigned inside the template of the component class.
-    callable_forward: Union[Callable, type]
+    callable_forward: Union[Callable, type] = callable_to_wrap
+    callable_signature: inspect.Signature
 
     # 1. define those vars
     # --------------------
-    # torch functions are builtin and their signatures mast be imported in a special way
     is_torch: bool = (name[0: name.find(".")] == "torch")
-    # We need to distinguish between functions and nn.Modules.
-    if inspect.isfunction(callable_to_wrap) or (is_torch and inspect.isbuiltin(callable_to_wrap)):
-        # in this case the "callable_forward" is directly the callable
+    # We need to distinguish between functions, builtins and nn.Modules.
+    if inspect.isfunction(callable_to_wrap):
+        callable_signature = inspect.signature(callable_to_wrap)
+    # torch functions are builtin and their signatures mast be imported in a special way
+    elif is_torch and inspect.isbuiltin(callable_to_wrap):
         callable_forward = callable_to_wrap
+        # builtsins in torch can be overloaded, so we need to select one of the signatures (by default the first one)
+        signs: Optional[List[inspect.Signature]] = (
+            torch.fx.operator_schemas.get_signature_for_torch_op(callable_to_wrap))
+        assert signs is not None, f"Something weird happened with {name}. It should have a signature."
+        callable_signature = signs[0]
     elif isinstance(callable_to_wrap, type) and nn.Module in inspect.getmro(callable_to_wrap):
         # in this case "callable_forward" refers to the forward method in the original nn.Module
         callable_forward = callable_to_wrap.forward  # type: ignore  # mypy don't know about the forward method
+        callable_signature = inspect.signature(callable_forward)
     else:
         raise TypeError(f"{callable_to_wrap} must be a function, a torch builtin or an nn.Module.")
 
@@ -109,10 +118,9 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
         inputs = Params()
         params: Union[Dict[str, str], List[inspect.Parameter]] = extra.get("params", {})
         if not params:
-            # NOTE: callable_forward needs to be predefined
+            # NOTE: callable_signature needs to be predefined
             # if there are no params in extra, we use the signature of the function
-            sign: inspect.Signature = inspect.signature(callable_forward)
-            params = list(sign.parameters.values())
+            params = list(callable_signature.parameters.values())
         for param in params:
             if isinstance(param, inspect.Parameter):
                 p_name: str = param.name
@@ -143,6 +151,9 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
     def _helper_to_add_returns(outputs: Params, return_annotation: Any, name: Optional[List[str]] = None) -> None:
         if name is None:
             name = ["out"]
+        # if the return_annotation is None, we need to convert it into its type (anyway this shouldn't happen)
+        if return_annotation is None:
+            return_annotation = NoneType
         if not typeguard.isclass(return_annotation) and return_annotation._name == "Tuple":
             # variable number of outputs
             # NOTE: if there are several names, len(name) and the number of returns must coincide!!!
@@ -168,10 +179,9 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
         returns: Union[str, Dict[str, str], List[str]] = extra.get("returns", {})
         # if the returns are a list we still need the signature of the function
         if not returns or isinstance(returns, list):
-            # NOTE: callable_forward needs to be predefined
+            # NOTE: callable_signature needs to be predefined
             # if there are no returns in extra, we use the signature to get them
-            sign: inspect.Signature = inspect.signature(callable_forward)
-            return_annotation: Any = sign.return_annotation
+            return_annotation: Any = callable_signature.return_annotation
         # get returns only using the signature
         if not returns:
             if isinstance_namedtuple(return_annotation):
@@ -188,11 +198,9 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
         #    - List[str] to force the name of the output parameter of the callable
         #    - Dict[str, str] to force the name and the type of the output parameter of the callable
         #############################################################################################
-        # if returns is a string we only need to eval() it
         elif isinstance(returns, str):
             _import_if_it_is_possible([returns])
             outputs.declare("out", eval(returns, COMP_GLOBALS))
-        # if returns is a list we need to rename the outputs with the names in the list
         elif isinstance(returns, list):
             _helper_to_add_returns(outputs, return_annotation, returns)
         elif isinstance(returns, dict):
@@ -230,7 +238,7 @@ def component_factory(name: str, callable_to_wrap: Union[Callable, type], extra:
         # 1. Write the parameters of the __init__ method and the call to the forward method
         init_params: Dict[str, str] = extra.get("init", {})
         if not init_params:
-            init_params = _get_params(name)
+            init_params = _get_params(inspect.signature(callable_to_wrap))
         else:
             for param in init_params:
                 _import_if_it_is_possible([init_params[param]])
@@ -274,10 +282,8 @@ def _get_annotation(annotation: Any) -> str:
         return str(annotation)
 
 
-def _get_params(name: str) -> Dict[str, str]:
+def _get_params(sign: inspect.Signature) -> Dict[str, str]:
     params: Dict[str, str] = {}
-    _add_modules_to_globals(["inspect"])
-    sign = eval(f"inspect.signature({name})", COMP_GLOBALS)
     for param in sign.parameters.values():
         params[param.name] = _get_annotation(param.annotation)
         # if there is a default value, we add it
