@@ -4,6 +4,7 @@ torch.select:
 
 torch.unbind:
   idx: 0
+  returns: {here: "typing.Tuple[torch.Tensor, ...]"}  # it is wrong in the signature
 
 torch.stack:
   params: {input: "typing.Sequence[torch.Tensor]", dim: int = 0}
