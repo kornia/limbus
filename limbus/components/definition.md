@@ -19,7 +19,7 @@ To create components using the automatic approach you need to create a `yml` fil
     - the function signature cannot be obtained
     - when we want to force a typing to the inputs arguments
         - note that the typings must be compatible with the original ones.
-    - when not all the inputs should be exposed (in this case the hidden args must have by default values)
+    - when not all the inputs should be exposed (in this case the hidden args require default values)
     - we want to force some args to default values
 
     E.g.:

@@ -20,13 +20,12 @@ import torch
 import visdom
 import kornia
 
-from limbus.core import Component, ComponentState, Params, register_component
+from limbus.core import Component, ComponentState, Params
 
 
 log = logging.getLogger(__name__)
 
 
-@register_component
 class ImageReader(Component):
     """Component that holds a constant.
 
@@ -73,7 +72,6 @@ class ImageReader(Component):
         return ComponentState.OK
 
 
-@register_component
 class ImageShow(Component):
     """Component to show the input image."""
     def __init__(self, name: str):
@@ -114,7 +112,6 @@ class ImageShow(Component):
         pass
 
 
-@register_component
 class Constant(Component):
     """Component that holds a constant."""
     def __init__(self, name: str, value: Any):
@@ -133,7 +130,6 @@ class Constant(Component):
         return ComponentState.OK
 
 
-@register_component
 class Printer(Component):
     """Component to print the input in the console."""
     def __init__(self, name: str):
@@ -152,7 +148,6 @@ class Printer(Component):
 
 
 # Example of a simple component created from the API
-@register_component
 class Adder(Component):
     """Component to add two inputs and output the result."""
     def __init__(self, name: str):
@@ -179,7 +174,6 @@ class Adder(Component):
 
 
 # temporal classes while we solve pending issues. TODO: allow components as parameters
-@register_component
 class ImageStitcher(Component):
     """Component to stitch images together."""
     def __init__(self, name: str, estimator: str = 'ransac', blending_method: str = 'naive'):
@@ -205,7 +199,6 @@ class ImageStitcher(Component):
         return ComponentState.OK
 
 
-@register_component
 class ImageRegistrator(Component):
     """Component to register images."""
     def __init__(self, name: str):
