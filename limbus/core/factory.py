@@ -41,7 +41,7 @@ ComponentDefinition = Dict[str, ExtraParams]
 
 def _add_modules_to_globals(modules: List[str], dynamic_module: str) -> None:
     """Add the modules in the list to the globals where the component will be defined.
-    
+
     Args:
         modules: list of modules to add to the globals. The first module in each element will be added.
         dynamic_module: the module where the component will be defined. The entire list of modules will be added to the
@@ -309,7 +309,7 @@ def component_factory(module: str, name: str, extra: ExtraParams) -> None:
     # -----------------------------
     # define the name of the component class by removing the first module name (remember that it is the one dynamically
     # created to contain the dynamic code)
-    str_name = name[name.rfind('.')+1:]
+    str_name = name[name.rfind('.') + 1:]
     # create the class
     if inspect.isfunction(callable_to_wrap) or inspect.isbuiltin(callable_to_wrap):
         # 1. define the class template
@@ -360,7 +360,6 @@ def register_components(lst_components: List[ComponentDefinition]) -> None:
         name: str = list(cmp.keys())[0]
         elem = list(cmp.values())[0]
         extras: ExtraParams = elem if elem is not None else {}
-        
         if name.find(".") == -1:
             raise ValueError(f"The component name ({name}) must be in the format module.component")
         module: str = name[:name.rfind(".")]
@@ -411,7 +410,7 @@ def register_component(cls, dst_module) -> None:
     _add_modules_to_globals([], dst_module)  # creates the dynamic module if it doesn't exist
     globals = COMP_GLOBALS
     for mod in dst_module.split("."):
-        globals = COMP_GLOBALS[mod].__dict__
+        globals = globals[mod].__dict__
 
     # TODO: validate that this code covers all the cases
     module = cls.__module__

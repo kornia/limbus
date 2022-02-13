@@ -1,5 +1,5 @@
 from limbus.core import ComponentsManager
-from limbus.components import Constant, Printer, Adder
+from limbus.components.base import Constant, Printer, Adder
 
 import torch
 
