@@ -1,6 +1,5 @@
 from limbus.core import ComponentsManager
-from limbus.components import (  # type: ignore
-    limbus___Constant as Constant, limbus___Printer as Printer, limbus___Adder as Adder)
+from limbus.components import Constant, Printer, Adder
 
 import torch
 
