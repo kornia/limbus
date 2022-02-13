@@ -348,7 +348,7 @@ def component_factory(module: str, name: str, extra: ExtraParams) -> None:
 
 
 def register_components(lst_components: List[ComponentDefinition]) -> None:
-    """Register all the components of a list of components.
+    """Create and register all the components of a list of components.
 
     Args:
         lst_components: List of components to register.
@@ -370,7 +370,7 @@ def register_components(lst_components: List[ComponentDefinition]) -> None:
 
 
 def register_components_from_yml(file_name: str) -> None:
-    """Register the components defined in the yml file.
+    """Create and register components defined in the yml file.
 
     Args:
         file_name: name of the yml file containing the components. For details look at `definition.md`.
@@ -391,8 +391,8 @@ def register_components_from_yml(file_name: str) -> None:
     register_components(lst)
 
 
-def register_component(cls, dst_module) -> None:
-    """Register a concrete component in a concrete location.
+def register_component(cls: Component, dst_module: str) -> None:
+    """Register a already created component in a concrete location.
 
     Args:
         cls: class to be registered.
@@ -417,4 +417,4 @@ def register_component(cls, dst_module) -> None:
     if module != "__main__":
         # if the component belong to a module...
         _add_modules_to_globals([module], dst_module)
-    globals[cls.__name__] = cls
+    globals[cls.__name__] = cls  # type: ignore  # mypy does not recognise __name__ as str
