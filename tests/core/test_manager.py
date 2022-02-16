@@ -19,4 +19,4 @@ def test_pipeline():
     manager.traverse()
     manager.execute(1)
 
-    torch.allclose(add.outputs.out, torch.ones(1, 3) * 3.)
+    torch.allclose(add.outputs.out.value, torch.ones(1, 3) * 3.)

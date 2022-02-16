@@ -23,7 +23,7 @@ class NoValue():
 
 class Param:
     """Class to store data for each parameter."""
-    def __init__(self,  name: str, tp: Any = Any, value: Any = NoValue(), arg: Optional[str] = None) -> None:
+    def __init__(self, name: str, tp: Any = Any, value: Any = NoValue(), arg: Optional[str] = None) -> None:
         self._name: str = name
         self._value: Any = value
         self._type: Any = tp
@@ -59,7 +59,8 @@ class Param:
         """
         self._value = value
 
-    def connect():
+    def connect(self):
+        """Connect this parameter with another parameter."""
         pass
 
 
@@ -77,6 +78,8 @@ class Params:
                             E.g. this is useful to propagate datatypes and values from the target pin to the arg.
 
         """
+        if isinstance(value, Param):
+            value = value.value
         if not isinstance(value, NoValue):
             typeguard.check_type("value", value, tp)
         setattr(self, name, Param(name, tp, value, arg))
@@ -110,13 +113,12 @@ class Params:
         return getattr(self, name).type
 
     def get_param(self, name: str) -> Any:
-        """Return the param value after checking the type.
+        """Return the param value.
 
         Args:
             name: name of the param.
 
         """
-        typeguard.check_type(name, getattr(self, name).value, self.get_type(name))
         return getattr(self, name).value
 
     def set_param(self, name: str, value: Any) -> None:
@@ -127,6 +129,8 @@ class Params:
             value: value to be setted.
 
         """
+        if isinstance(value, Param):
+            value = value.value
         typeguard.check_type(name, value, self.get_type(name))
         getattr(self, name).value = value
 

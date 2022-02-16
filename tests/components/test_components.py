@@ -10,19 +10,20 @@ class TestConstant:
     def test_smoke(self, value):
         c = Constant("k", value)
         assert c.name == "k"
-        assert isinstance(c.outputs.out, NoValue)
+        assert isinstance(c.outputs.out.value, NoValue)
 
         c.forward(c.inputs)
-        assert c.outputs.out == value
+        assert c.outputs.out.value == value
 
 
 class TestAdder:
     def test_smoke(self):
         add = Adder("add")
         assert add.name == "add"
-        assert isinstance(add.outputs.out, NoValue)
+        print(add.outputs.get_param("out"))
+        assert isinstance(add.outputs.get_param("out"), NoValue)
 
-        add.inputs.a = torch.tensor(2.)
-        add.inputs.b = torch.tensor(3.)
+        add.inputs.a.value = torch.tensor(2.)
+        add.inputs.b.value = torch.tensor(3.)
         add.forward(add.inputs)
-        assert add.outputs.out == torch.tensor(5.)
+        assert add.outputs.out.value == torch.tensor(5.)
