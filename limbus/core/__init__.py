@@ -1,6 +1,7 @@
 from limbus.core.component import Component, ComponentState, Params, NoValue
 from limbus.core.manager import ComponentsManager, DefaultParam
-from limbus.core.factory import ComponentDefinition, register_components, register_component
+from limbus.core.factory import (
+    ComponentDefinition, register_components, register_component, register_components_from_yml)
 
 __all__ = [
     "ComponentsManager",
@@ -10,5 +11,6 @@ __all__ = [
     "Params",
     "register_components",
     "register_component",
+    "register_components_from_yml",
     "ComponentDefinition",
     "NoValue"]

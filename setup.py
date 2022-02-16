@@ -12,7 +12,8 @@ setup(name='limbus',
           'tensorboard',
           'visdom',
           'typeguard',
-          'kornia'
+          'kornia',
+          'pyyaml'
       ],
       extras_require={
           'dev': [
@@ -24,7 +25,8 @@ setup(name='limbus',
               'mypy',  # TODO: check if we can remove the deps without pytest-*
               'pydocstyle',
               'flake8',
-              'pep8-naming'
+              'pep8-naming',
+              'types-PyYAML'
           ]
       },
       packages=find_packages(),

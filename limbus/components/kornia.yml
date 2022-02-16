@@ -1,0 +1,29 @@
+kornia.augmentation.RandomCrop:
+  init: {size: "typing.Tuple[int, int]"}
+  params: {input: torch.Tensor}
+  returns: torch.Tensor
+kornia.geometry.transform.warp_perspective:
+kornia.feature.LoFTR:
+kornia.contrib.ImageStitcher:
+kornia.contrib.histogram_matching:
+kornia.geometry.transform.center_crop:
+kornia.geometry.transform.crop_and_resize:
+kornia.geometry.transform.Scale:
+kornia.geometry.transform.Rotate:
+kornia.geometry.transform.Translate:
+kornia.geometry.transform.Shear:
+kornia.geometry.transform.PyrDown:
+kornia.geometry.transform.PyrUp:
+kornia.geometry.transform.ScalePyramid:
+kornia.geometry.transform.Hflip:
+kornia.geometry.transform.Vflip:
+kornia.geometry.transform.Rot180:
+kornia.geometry.transform.Resize:
+kornia.geometry.transform.Rescale:
+kornia.geometry.transform.Affine:
+kornia.geometry.transform.HomographyWarper:
+kornia.enhance.normalize_min_max:
+kornia.enhance.image_histogram2d: {returns: [out, out2]}  # we already know the types
+kornia.color.rgb_to_hls: {returns: torch.Tensor}
+kornia.color.hls_to_rgb:
+kornia.enhance.equalize_clahe:
