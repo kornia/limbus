@@ -196,7 +196,7 @@ class ComponentsManager(nn.Module):
                             pass
 
                         assert isinstance(link, _Link)
-                        value = self.nodes[link.node].component.outputs[link.pin]
+                        value = self.nodes[link.node].component.outputs[link.pin].value
                         if link.idx is not None:
                             # select the correct value from the list
                             value = value[link.idx]

@@ -21,11 +21,50 @@ class NoValue():
     pass
 
 
+class Param:
+    """Class to store data for each parameter."""
+    def __init__(self,  name: str, tp: Any = Any, value: Any = NoValue(), arg: Optional[str] = None) -> None:
+        self._name: str = name
+        self._value: Any = value
+        self._type: Any = tp
+        self._arg: Optional[str] = arg
+
+    @property
+    def arg(self) -> Optional[str]:
+        """Get the argument realted with the param."""
+        return self._arg
+
+    @property
+    def type(self) -> Any:
+        """Return the type of the parameter."""
+        return self._type
+
+    @property
+    def name(self) -> str:
+        """Get the name of the parameter."""
+        return self._name
+
+    @property
+    def value(self) -> Any:
+        """Get the value of the parameter."""
+        return self._value
+
+    @value.setter
+    def value(self, value: Any) -> None:
+        """Set the value of the parameter.
+
+        Args:
+            value (Any): The value to set.
+
+        """
+        self._value = value
+
+    def connect():
+        pass
+
+
 class Params:
     """Class to store parameters."""
-    def __init__(self) -> None:
-        self._types: Dict[str, Any] = {}
-        self._args: Dict[str, Optional[str]] = {}
 
     def declare(self, name: str, tp: Any = Any, value: Any = NoValue(), arg: Optional[str] = None) -> None:
         """Add or modify a param.
@@ -40,9 +79,7 @@ class Params:
         """
         if not isinstance(value, NoValue):
             typeguard.check_type("value", value, tp)
-        setattr(self, name, value)
-        self._types[name] = tp
-        self._args[name] = arg
+        setattr(self, name, Param(name, tp, value, arg))
 
     def get_related_arg(self, name: str) -> Optional[str]:
         """Return the argument related with a given param.
@@ -51,15 +88,17 @@ class Params:
             name: name of the param.
 
         """
-        return self._args[name]
+        return getattr(self, name).arg
 
     def get_params(self) -> Collection[str]:
         """Return the name of all the params."""
-        return self._types.keys()
+        return {name for name in sorted(self.__dict__) if not name.startswith('_')}
 
     def get_types(self) -> Dict[str, type]:
         """Return the name and the type of all the params."""
-        return self._types
+        types: Dict[str, type] = {
+            name: getattr(self, name).type for name in sorted(self.__dict__) if not name.startswith('_')}
+        return types
 
     def get_type(self, name: str) -> type:
         """Return the type of a given param.
@@ -68,7 +107,7 @@ class Params:
             name: name of the param.
 
         """
-        return self._types[name]
+        return getattr(self, name).type
 
     def get_param(self, name: str) -> Any:
         """Return the param value after checking the type.
@@ -77,8 +116,8 @@ class Params:
             name: name of the param.
 
         """
-        typeguard.check_type(name, getattr(self, name), self.get_type(name))
-        return getattr(self, name)
+        typeguard.check_type(name, getattr(self, name).value, self.get_type(name))
+        return getattr(self, name).value
 
     def set_param(self, name: str, value: Any) -> None:
         """Set the param value after checking the type.
@@ -89,7 +128,7 @@ class Params:
 
         """
         typeguard.check_type(name, value, self.get_type(name))
-        setattr(self, name, value)
+        getattr(self, name).value = value
 
     def __getitem__(self, name: str) -> Any:
         return getattr(self, name)
@@ -99,7 +138,7 @@ class Params:
             (
                 f'{type(self).__name__}(',
                 ', '.join(
-                    f'{name}={getattr(self, name)}' for name in sorted(self.__dict__) if not name.startswith('_')
+                    f'{name}={getattr(self, name).value}' for name in sorted(self.__dict__) if not name.startswith('_')
                 ),
                 ')',
             )
