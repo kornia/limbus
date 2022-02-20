@@ -39,6 +39,7 @@ class _Node:
     outputs: Dict[Any, List[Union[Dict[int, _Link], _Link]]]
 
 
+# TODO: check why I added this DefaultParam class, now it is not used
 class DefaultParam():
     """Trick to denote when to use a default parameter."""
     pass
@@ -210,7 +211,7 @@ class ComponentsManager(nn.Module):
                             # if it is not a slice we can assign the value directly
                             if isinstance(value, DefaultParam):
                                 # without slicing we accept default values
-                                values = obj.inputs[pin].default
+                                values = obj.inputs[pin].value
                             else:
                                 values = value
                             break
