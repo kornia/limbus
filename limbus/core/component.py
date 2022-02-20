@@ -73,9 +73,32 @@ class Param:
         typeguard.check_type(self._name, value, self._type)
         self._value.value = value
 
-    def connect(self):
-        """Connect this parameter with another parameter."""
-        pass
+    def connect(self, dst: "Param") -> None:
+        """Connect this parameter with the dst parameter."""
+        # TODO: check that dst param is an input param
+        # TODO: check type compatibility
+        dst._value = self._value
+        self._refs.append(dst)
+        dst._refs.append(self)
+        if len(dst._refs) > 1:
+            raise ValueError(f"An input parameter can only be connected to 1 param. "
+                             f"Dst param '{dst.name}' is connected to {dst._refs}.")
+
+    def disconnect(self, dst: "Param") -> None:
+        """Disconnect this parameter from the dst parameter."""
+        try:
+            self._refs.remove(dst)
+        except:
+            pass
+        try:
+            dst._refs.remove(self)
+        except:
+            pass
+        if len(dst._refs) == 0:
+            dst._value = Value(self._value.value)
+        else:
+            raise ValueError(f"An input parameter can only be connected to 1 param. "
+                             f"Dst param '{dst.name}' is connected to {dst._refs}.")
 
 
 class Params:
