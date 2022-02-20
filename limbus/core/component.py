@@ -74,18 +74,17 @@ class Params:
             name: name of the parameter.
             tp: type (e.g. str, int, list, Union[str, int]...). Default: typing.Any
             value (optional): value for the parameter. Default: NoValue().
-            arg (optional): argument directly related with the value of the parameter. Default: None.
-                            E.g. this is useful to propagate datatypes and values from the target pin to the arg.
+            arg (optional): Component argument directly related with the value of the parameter. Default: None.
+                            E.g. this is useful to propagate datatypes and values from a pin with a default value to
+                            an argument in a Component (GUI).
 
         """
         if isinstance(value, Param):
             value = value.value
-        if not isinstance(value, NoValue):
-            typeguard.check_type("value", value, tp)
         setattr(self, name, Param(name, tp, value, arg))
 
     def get_related_arg(self, name: str) -> Optional[str]:
-        """Return the argument related with a given param.
+        """Return the Component argument related with a given param.
 
         Args:
             name: name of the param.
@@ -122,19 +121,16 @@ class Params:
         return getattr(self, name).value
 
     def set_param(self, name: str, value: Any) -> None:
-        """Set the param value after checking the type.
+        """Set the param value.
 
         Args:
             name: name of the param.
             value: value to be setted.
 
         """
-        if isinstance(value, Param):
-            value = value.value
-        typeguard.check_type(name, value, self.get_type(name))
         getattr(self, name).value = value
 
-    def __getitem__(self, name: str) -> Any:
+    def __getitem__(self, name: str) -> Param:
         return getattr(self, name)
 
     def __repr__(self) -> str:
