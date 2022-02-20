@@ -167,16 +167,11 @@ def component_factory(module: str, name: str, extra: ExtraParams) -> None:
 
     # 2. define the forward(), register_inputs() and register_outputs() methods
     # -------------------------------------------------------------------------
-    def forward(self, inputs: Params) -> ComponentState:  # noqa: D417
-        """Run the component.
-
-        Args:
-            inputs: set of values to be used to run the component.
-
-        """
+    def forward(self) -> ComponentState:  # noqa: D417
+        """Run the component."""
         args: Dict[str, Any] = {}
         for param in self._inputs.get_params():
-            args[param] = inputs.get_param(param)
+            args[param] = self._inputs.get_param(param)
         # mypy cannot infer that the class has this method
         res = self._callable(**args)  # type: ignore
         if len(self._outputs.get_params()) > 1:

@@ -1,7 +1,7 @@
 """Component definition."""
 from dataclasses import dataclass
 from abc import abstractmethod
-from typing import Dict, Any, Collection, Optional, List
+from typing import Dict, Any, Set, Optional, List, Iterator, Iterable
 from enum import Enum
 
 import typeguard
@@ -73,6 +73,11 @@ class Param:
         typeguard.check_type(self._name, value, self._type)
         self._value.value = value
 
+    @property
+    def ref_counter(self) -> int:
+        """Return the number of references for this parameter."""
+        return len(self._refs)
+
     def connect(self, dst: "Param") -> None:
         """Connect this parameter with the dst parameter."""
         # TODO: check that dst param is an input param
@@ -101,7 +106,7 @@ class Param:
                              f"Dst param '{dst.name}' is connected to {dst._refs}.")
 
 
-class Params:
+class Params(Iterable):
     """Class to store parameters."""
 
     def declare(self, name: str, tp: Any = Any, value: Any = NoValue(), arg: Optional[str] = None) -> None:
@@ -129,9 +134,19 @@ class Params:
         """
         return getattr(self, name).arg
 
-    def get_params(self) -> Collection[str]:
-        """Return the name of all the params."""
-        return {name for name in sorted(self.__dict__) if not name.startswith('_')}
+    def get_params(self, only_connected: bool = False) -> Set[str]:
+        """Return the name of all the params.
+
+        Args:
+            only_connected: If True, only return the params that are connected.
+
+        """
+        params = set()
+        for name in sorted(self.__dict__):
+            param = getattr(self, name)
+            if isinstance(param, Param) and (not only_connected or param.ref_counter):
+                params.add(name)
+        return params
 
     def get_types(self) -> Dict[str, type]:
         """Return the name and the type of all the params."""
@@ -157,6 +172,9 @@ class Params:
         """
         return getattr(self, name).value
 
+    def __len__(self) -> int:
+        return len(self.get_params())
+
     def set_param(self, name: str, value: Any) -> None:
         """Set the param value.
 
@@ -169,6 +187,12 @@ class Params:
 
     def __getitem__(self, name: str) -> Param:
         return getattr(self, name)
+
+    def __iter__(self) -> Iterator[Param]:
+        for name in sorted(self.__dict__):
+            attr = getattr(self, name)
+            if isinstance(attr, Param):
+                yield attr
 
     def __repr__(self) -> str:
         return ''.join(
@@ -226,13 +250,8 @@ class Component(nn.Module):
         return self._outputs
 
     @abstractmethod
-    def forward(self, inputs: Params) -> ComponentState:
-        """Run the component.
-
-        Args:
-         inputs: set of values to be used to run the component.
-
-        """
+    def forward(self) -> ComponentState:
+        """Run the component."""
         return ComponentState.NotImplemented
 
     def finish_iter(self) -> None:

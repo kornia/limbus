@@ -7,15 +7,15 @@ import torch
 def test_pipeline():
     c1 = Constant("c1", 2 * torch.ones(1, 3))
     c2 = Constant("c2", torch.ones(1, 3))
-
     add = Adder("add")
     show = Printer("print")
 
-    manager = ComponentsManager()
-    manager.connect(c1, "out", add, "a")
-    manager.connect(c2, "out", add, "b")
-    manager.connect(add, "out", show, "inp")
+    c1.outputs.out.connect(add.inputs.a)
+    c2.outputs.out.connect(add.inputs.b)
+    add.outputs.out.connect(show.inputs.inp)
 
+    manager = ComponentsManager()
+    manager.add([c1, c2, add, show])
     manager.traverse()
     manager.execute(1)
 

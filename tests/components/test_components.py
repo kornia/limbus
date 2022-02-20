@@ -11,8 +11,7 @@ class TestConstant:
         c = Constant("k", value)
         assert c.name == "k"
         assert isinstance(c.outputs.out.value, NoValue)
-
-        c.forward(c.inputs)
+        c()
         assert c.outputs.out.value == value
 
 
@@ -25,5 +24,5 @@ class TestAdder:
 
         add.inputs.a.value = torch.tensor(2.)
         add.inputs.b.value = torch.tensor(3.)
-        add.forward(add.inputs)
+        add()
         assert add.outputs.out.value == torch.tensor(5.)

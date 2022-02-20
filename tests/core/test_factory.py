@@ -27,19 +27,18 @@ def test_registry():
             outputs.declare("out", torch.Tensor)
             return outputs
 
-        def forward(self, inputs: Params) -> ComponentState:  # noqa: D102
-            a = inputs.get_param("a")
-            b = inputs.get_param("b")
+        def forward(self) -> ComponentState:  # noqa: D102
+            a = self.inputs.get_param("a")
+            b = self.inputs.get_param("b")
             self._outputs.set_param("out", a - b)
             return ComponentState.OK
 
     core.register_component(Subs, "test0.test1")
     subs = limbus.components.test0.test1.Subs("name")  # type: ignore
 
-    inp = Params()
-    inp.declare("a", torch.Tensor, torch.randn(2, 3))
-    inp.declare("b", torch.Tensor, torch.randn(2, 3))
-    subs(inp)
+    subs.inputs.set_param("a", torch.randn(2, 3))
+    subs.inputs.set_param("b", torch.randn(2, 3))
+    subs()
     assert subs.outputs.get_param("out").shape == torch.Size([2, 3])
 
 
@@ -53,10 +52,9 @@ def test_registry_from_yml_with_args(tmpdir_factory):
     """)
     core.register_components_from_yml(str(fn))
     comp = limbus.components.torch.unsqueeze("test")
-    inp = Params()
-    inp.declare("input", torch.Tensor, torch.randn(2, 3))
-    inp.declare("dim", int, 2)
-    comp(inp)
+    comp.inputs.set_param("input", torch.randn(2, 3))
+    comp.inputs.set_param("dim", 2)
+    comp()
     assert comp.outputs.get_param("out").shape == torch.Size([2, 3, 1])
 
 
@@ -70,10 +68,9 @@ def test_registry_from_yml_with_args_changing_output_name(tmpdir_factory):
     """)
     core.register_components_from_yml(str(fn))
     comp = limbus.components.torch.unsqueeze("test")
-    inp = Params()
-    inp.declare("input", torch.Tensor, torch.randn(2, 3))
-    inp.declare("dim", int, 2)
-    comp(inp)
+    comp.inputs.set_param("input", torch.randn(2, 3))
+    comp.inputs.set_param("dim", 2)
+    comp()
     assert comp.outputs.get_param("my_name").shape == torch.Size([2, 3, 1])
 
 
@@ -87,10 +84,8 @@ def test_registry_from_yml_with_args_default_value(tmpdir_factory):
     """)
     core.register_components_from_yml(str(fn))
     comp = limbus.components.torch.unsqueeze("test")
-    inp = Params()
-    inp.declare("input", torch.Tensor, torch.randn(2, 3))
-    inp.declare("dim", int, comp.inputs.dim)  # TODO: default params shouldn't be explicitly declared
-    comp(inp)
+    comp.inputs.set_param("input", torch.randn(2, 3))
+    comp()
     assert comp.outputs.get_param("out").shape == torch.Size([2, 3, 1])
 
 
@@ -103,10 +98,9 @@ def test_registry_from_yml_with_signature_idx(tmpdir_factory):
     """)
     core.register_components_from_yml(str(fn))
     comp = limbus.components.torch.unsqueeze("test")
-    inp = Params()
-    inp.declare("input", torch.Tensor, torch.randn(2, 3))
-    inp.declare("dim", int, 2)
-    comp(inp)
+    comp.inputs.set_param("input", torch.randn(2, 3))
+    comp.inputs.set_param("dim", 2)
+    comp()
     assert comp.outputs.get_param("out").shape == torch.Size([2, 3, 1])
 
 
@@ -118,8 +112,7 @@ def test_registry_from_yml_only_name(tmpdir_factory):
     """)
     core.register_components_from_yml(str(fn))
     comp = limbus.components.torch.unsqueeze("test")
-    inp = Params()
-    inp.declare("input", torch.Tensor, torch.randn(2, 3))
-    inp.declare("dim", int, 2)
-    comp(inp)
+    comp.inputs.set_param("input", torch.randn(2, 3))
+    comp.inputs.set_param("dim", 2)
+    comp()
     assert comp.outputs.get_param("out").shape == torch.Size([2, 3, 1])
