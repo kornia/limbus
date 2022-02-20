@@ -1,6 +1,7 @@
 """Component definition."""
+from dataclasses import dataclass
 from abc import abstractmethod
-from typing import Dict, Any, Collection, Optional
+from typing import Dict, Any, Collection, Optional, List
 from enum import Enum
 
 import typeguard
@@ -21,13 +22,23 @@ class NoValue():
     pass
 
 
+@dataclass
+class Value():
+    """Denote that a param has a value."""
+    value: Any
+
+
 class Param:
     """Class to store data for each parameter."""
     def __init__(self, name: str, tp: Any = Any, value: Any = NoValue(), arg: Optional[str] = None) -> None:
         self._name: str = name
-        self._value: Any = value
+        self._value: Value = Value(value)
         self._type: Any = tp
         self._arg: Optional[str] = arg
+        self._refs: List["Param"] = []
+        # validate that the type is coherent with the value
+        if not isinstance(value, NoValue):
+            typeguard.check_type(name, value, tp)
 
     @property
     def arg(self) -> Optional[str]:
@@ -47,7 +58,7 @@ class Param:
     @property
     def value(self) -> Any:
         """Get the value of the parameter."""
-        return self._value
+        return self._value.value
 
     @value.setter
     def value(self, value: Any) -> None:
@@ -57,7 +68,10 @@ class Param:
             value (Any): The value to set.
 
         """
-        self._value = value
+        if isinstance(value, Param):
+            value = value.value
+        typeguard.check_type(self._name, value, self._type)
+        self._value.value = value
 
     def connect(self):
         """Connect this parameter with another parameter."""
