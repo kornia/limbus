@@ -1,4 +1,5 @@
-from limbus.core import ComponentsManager
+from limbus.core import Pipeline
+import limbus.components
 from limbus.components.base import Constant, Printer, Adder
 
 import torch
@@ -14,8 +15,8 @@ def test_pipeline():
     c2.outputs.out.connect(add.inputs.b)
     add.outputs.out.connect(show.inputs.inp)
 
-    manager = ComponentsManager()
-    manager.add([c1, c2, add, show])
+    manager = Pipeline()
+    manager.add_nodes([c1, c2, add, show])
     manager.traverse()
     manager.execute(1)
 

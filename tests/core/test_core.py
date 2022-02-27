@@ -1,6 +1,6 @@
 import pytest
 
-from limbus.core import Params, Component, ComponentsManager, NoValue
+from limbus.core import Params, Component, Pipeline, NoValue
 from limbus.core.component import Param
 import torch
 
@@ -51,7 +51,7 @@ class TestComponent:
 
 
 # TODO: test in detail the functions
-class TestComponentsManager:
+class TestPipeline:
     def test_smoke(self):
-        man = ComponentsManager()
+        man = Pipeline()
         man is not None

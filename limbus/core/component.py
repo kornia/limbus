@@ -1,11 +1,16 @@
 """Component definition."""
 from dataclasses import dataclass
 from abc import abstractmethod
-from typing import Dict, Any, Set, Optional, List, Iterator, Iterable
+from collections import defaultdict
+import typing
+from typing import Dict, Any, Set, Optional, List, Iterator, Iterable, Union, Tuple
 from enum import Enum
+import inspect
+import collections
 
 import typeguard
 import torch.nn as nn
+import numpy as np
 
 
 class ComponentState(Enum):
@@ -23,26 +28,139 @@ class NoValue():
 
 
 @dataclass
-class Value():
+class Container:
     """Denote that a param has a value."""
     value: Any
+
+
+@dataclass
+class IterableContainer:
+    """Denote that a param has an indexed value."""
+    container: Union[Container, "IterableContainer"]
+    index: int
+
+
+class IterableInputContainers:
+    """Denote that a param has an indexed value."""
+    def __init__(self, container: Optional[IterableContainer] = None):
+        containers = []
+        if container is not None:
+            containers = [container]
+        self._containers: List[IterableContainer] = containers
+
+    def __len__(self) -> int:
+        return len(self._containers)
+
+    def add(self, container: IterableContainer) -> None:
+        """Add an IterableValue to the list of values."""
+        self._containers.append(container)
+
+    def remove(self, index: int) -> None:
+        """Remove an IterableValue from the list of values."""
+        for container in self._containers:
+            if container.index == index:
+                self._containers.remove(container)
+                return
+
+    def get_ordered(self) -> List[Any]:
+        """Return a list with the values in the order denoted by the index in the IterableValue."""
+        indices: List[int] = []
+        for container in self._containers:
+            assert isinstance(container, IterableContainer)
+            indices.append(container.index)
+
+        containers: List[Any] = []
+        for pos_idx in np.argsort(indices):
+            # we asume cannot be empty elements, so we can append all the values
+            obj: Union[Container, IterableContainer] = self._containers[pos_idx].container
+            if isinstance(obj, IterableContainer):
+                obj = obj.container.value[obj.index]  # type: ignore  # Iterable[Any] is not indexable [index]
+            else:
+                assert isinstance(obj, Container)
+                obj = obj.value
+            containers.append(obj)
+        return containers
+
+
+def _check_subscriptable(datatype: type) -> bool:
+    """Checf if datatype is subscriptable.
+
+    Args:
+        datatype (type): type to be analised.
+
+    Returns:
+        bool: True if datatype is subscriptable, False otherwise.
+
+    """
+    if inspect.isclass(datatype):
+        return False
+
+    origin = typing.get_origin(datatype)
+    if inspect.isabstract(origin) and (collections.abc.Sequence or collections.abc.Iterable):
+        return True
+    # mypy complaints in the case origin is NoneType
+    if (inspect.isclass(origin) and isinstance(origin(), typing.Iterable)):  # type: ignore
+        return True
+    return False
+
+
+class IterableParam:
+    """Temporal class to manage indexing inside a parameter."""
+    def __init__(self, param: "Param", index: int) -> None:
+        self._param: Param = param
+        self._index: int = index
+        self._iter_value: Union[IterableContainer, IterableInputContainers]
+        if isinstance(param._value, Container):
+            self._iter_value = IterableContainer(param._value, index)
+        elif isinstance(param._value, IterableInputContainers):
+            # since it is an input, the pointer to the value is not relevant at this stage
+            self._iter_value = IterableContainer(Container(None), index)
+
+    @property
+    def param(self) -> "Param":
+        """Return the base parameter."""
+        return self._param
+
+    @property
+    def index(self) -> int:
+        """Return the selected index in the sequence."""
+        return self._index
+
+    @property
+    def value(self) -> Union[IterableContainer, IterableInputContainers]:
+        """Get the value of the parameter."""
+        return self._iter_value
+
+    def ref_counter(self) -> int:
+        """Return the number of references for this parameter."""
+        return self._param.ref_counter(self._index)
+
+    def connect(self, dst: Union["Param", "IterableParam"]) -> None:
+        """Connect this parameter with the dst parameter."""
+        self._param._connect(self, dst)
+
+    def disconnect(self, dst: Union["Param", "IterableParam"]) -> None:
+        """Connect this parameter with the dst parameter."""
+        self._param._disconnect(self, dst)
 
 
 class Param:
     """Class to store data for each parameter."""
     def __init__(self, name: str, tp: Any = Any, value: Any = NoValue(), arg: Optional[str] = None) -> None:
-        self._name: str = name
-        self._value: Value = Value(value)
-        self._type: Any = tp
-        self._arg: Optional[str] = arg
-        self._refs: List["Param"] = []
         # validate that the type is coherent with the value
         if not isinstance(value, NoValue):
             typeguard.check_type(name, value, tp)
 
+        self._name: str = name
+        self._type: Any = tp
+        self._arg: Optional[str] = arg
+        self._refs: Dict[Any, Set[Tuple["Param", Optional[int]]]] = defaultdict(set)
+        self._value: Union[Container, IterableContainer, IterableInputContainers] = Container(value)
+        self._is_subscriptable = _check_subscriptable(tp)
+
     @property
     def arg(self) -> Optional[str]:
-        """Get the argument realted with the param."""
+        """Get the argument related with the param."""
         return self._arg
 
     @property
@@ -56,9 +174,29 @@ class Param:
         return self._name
 
     @property
+    def references(self) -> Set[Tuple["Param", Optional[int]]]:
+        """Get all the references for the parameter."""
+        refs: Set[Tuple["Param", Optional[int]]] = set()
+        for ref_set in self._refs.values():
+            refs = refs.union(ref_set)
+        return refs
+
+    @property
     def value(self) -> Any:
         """Get the value of the parameter."""
-        return self._value.value
+        if isinstance(self._value, Container):
+            if isinstance(self._value.value, IterableContainer):
+                # mypy error: Iterable[Any] is not indexable [index]
+                return self._value.value.container.value[self._value.value.index]  # type: ignore
+            else:
+                return self._value.value
+            return self._value.value
+        elif isinstance(self._value, IterableInputContainers):
+            assert self._is_subscriptable
+            origin = typing.get_origin(self._type)
+            assert origin is not None
+            res_value: List[Any] = self._value.get_ordered()
+            return origin(res_value)
 
     @value.setter
     def value(self, value: Any) -> None:
@@ -70,40 +208,123 @@ class Param:
         """
         if isinstance(value, Param):
             value = value.value
+        if not isinstance(self._value, Container):
+            raise TypeError(f"Param '{self.name}' cannot be assigned.")
+        if isinstance(value, (Container, IterableContainer, Set)):
+            raise TypeError(f"The type of the value to be assigned to param '{self.name}' cannot have a Value type.")
         typeguard.check_type(self._name, value, self._type)
         self._value.value = value
 
-    @property
-    def ref_counter(self) -> int:
+    def ref_counter(self, index: Optional[int] = None) -> int:
         """Return the number of references for this parameter."""
-        return len(self._refs)
+        if index is not None:
+            return len(self._refs[index])
+        else:
+            return len(self.references)
 
-    def connect(self, dst: "Param") -> None:
+    def select(self, index: int) -> IterableParam:
+        """Select a slice of the parameter.
+
+        Args:
+            index (int): The index of the slice.
+
+        Returns:
+            Param: The selected slice.
+
+        """
+        if not self._is_subscriptable:
+            raise ValueError(f"The param '{self.name}' is not a subscriptable.")
+        # NOTE: we cannot check if the index is valid because it is not known at this point the len of the sequence
+        # create a new param with the selected slice inside the param
+        return IterableParam(self, index)
+
+    def _connect(self, ori: Union["Param", IterableParam], dst: Union["Param", IterableParam]) -> None:
         """Connect this parameter with the dst parameter."""
+        if self._is_subscriptable and isinstance(ori, Param):
+            raise ValueError(f"The param '{self.name}' must be connected using indexes.")
+
         # TODO: check that dst param is an input param
         # TODO: check type compatibility
-        dst._value = self._value
-        self._refs.append(dst)
-        dst._refs.append(self)
-        if len(dst._refs) > 1:
+        if (isinstance(dst, Param) and dst.ref_counter() > 0):
             raise ValueError(f"An input parameter can only be connected to 1 param. "
                              f"Dst param '{dst.name}' is connected to {dst._refs}.")
 
-    def disconnect(self, dst: "Param") -> None:
-        """Disconnect this parameter from the dst parameter."""
-        try:
-            self._refs.remove(dst)
-        except:
-            pass
-        try:
-            dst._refs.remove(self)
-        except:
-            pass
-        if len(dst._refs) == 0:
-            dst._value = Value(self._value.value)
-        else:
+        if isinstance(dst, IterableParam) and dst.param.ref_counter(dst.index) > 0:
             raise ValueError(f"An input parameter can only be connected to 1 param. "
-                             f"Dst param '{dst.name}' is connected to {dst._refs}.")
+                             f"Dst param '{dst.param.name}' is connected to {dst.param._refs}.")
+
+        # connect the param to the dst param
+        if isinstance(dst, Param) and isinstance(ori, Param):
+            assert isinstance(dst._value, Container)
+            assert isinstance(ori._value, Container)
+            dst._value = ori._value
+        elif isinstance(dst, IterableParam) and isinstance(ori, Param):
+            assert isinstance(dst._iter_value, IterableContainer)
+            assert isinstance(ori._value, Container)
+            dst._iter_value.container = ori._value
+        elif isinstance(dst, Param) and isinstance(ori, IterableParam):
+            assert isinstance(dst._value, Container)
+            assert isinstance(ori._iter_value, IterableContainer)
+            dst._value.value = ori._iter_value
+        else:
+            assert isinstance(dst, IterableParam)
+            assert isinstance(ori, IterableParam)
+            assert isinstance(dst._iter_value, IterableContainer)
+            assert isinstance(ori._iter_value, IterableContainer)
+            dst._iter_value.container = ori._iter_value
+
+        # if dest is an IterableParam means that several ori params can be connected to different dest indexes
+        # so they should be saved as a set of params
+        if isinstance(dst, IterableParam):
+            assert isinstance(dst._iter_value, IterableContainer)
+            if isinstance(dst.param._value, IterableInputContainers):
+                dst.param._value.add(dst._iter_value)
+            else:
+                dst.param._value = IterableInputContainers(dst._iter_value)
+
+        self._update_references('add', ori, dst)
+
+    def connect(self, dst: Union["Param", IterableParam]) -> None:
+        """Connect this parameter with the dst parameter."""
+        self._connect(self, dst)
+
+    def _disconnect(self, ori: Union["Param", IterableParam], dst: Union["Param", IterableParam]) -> None:
+        """Disconnect this parameter from the dst parameter."""
+        if isinstance(dst, Param):
+            assert isinstance(dst._value, Container)
+            dst._value = Container(NoValue())
+        elif isinstance(dst, IterableParam):
+            if isinstance(dst.param._value, IterableInputContainers):
+                assert isinstance(dst._iter_value, IterableContainer)
+                dst.param._value.remove(dst._iter_value.index)
+                if len(dst.param._value) == 0:
+                    dst.param._value = Container(NoValue())
+            else:
+                dst.param._value = Container(NoValue())
+
+        self._update_references('remove', ori, dst)
+
+    def _update_references(self, type: str, ori: Union["Param", IterableParam], dst: Union["Param", IterableParam]
+                           ) -> None:
+        # assign references
+        ori_idx = None
+        dst_idx = None
+        if isinstance(ori, IterableParam):
+            ori_idx = ori.index
+            ori = ori.param
+        if isinstance(dst, IterableParam):
+            dst_idx = dst.index
+            dst = dst.param
+        if type == 'add':
+            ori._refs[ori_idx].add((dst, dst_idx))
+            dst._refs[dst_idx].add((ori, ori_idx))
+        elif type == 'remove':
+            ori._refs[ori_idx].remove((dst, dst_idx))
+            dst._refs[dst_idx].remove((ori, ori_idx))
+
+    def disconnect(self, dst: Union["Param", IterableParam]) -> None:
+        """Disconnect this parameter from the dst parameter."""
+        self._disconnect(self, dst)
 
 
 class Params(Iterable):
@@ -144,7 +365,7 @@ class Params(Iterable):
         params = set()
         for name in sorted(self.__dict__):
             param = getattr(self, name)
-            if isinstance(param, Param) and (not only_connected or param.ref_counter):
+            if isinstance(param, Param) and (not only_connected or param.ref_counter()):
                 params.add(name)
         return params
 

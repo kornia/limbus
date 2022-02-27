@@ -1,5 +1,5 @@
 """Components manager to connect, traverse and execute pipelines."""
-from typing import List, Optional, Union, Set
+from typing import List, Optional, Union, Set, Tuple
 import logging
 import time
 
@@ -19,17 +19,14 @@ class DefaultParam():
     pass
 
 
-class ComponentsManager(nn.Module):
-    """Class to manage the Limbus Components.
-
-    It holds the logic to construct the pipeline to link components.
-    """
+class Pipeline(nn.Module):
+    """Class to create and execute a pipeline of Limbus Components."""
     def __init__(self):
         self.nodes: Set[Component] = set()
         self._seq: List[Component] = []
 
-    def add(self, components: Union[Component, List[Component]]) -> None:
-        """Add components to the manager.
+    def add_nodes(self, components: Union[Component, List[Component]]) -> None:
+        """Add components to the pipeline.
 
         Args:
             components: Component or list of components to be added.
@@ -42,9 +39,10 @@ class ComponentsManager(nn.Module):
 
     def _all_connected(self, ori: Params, dst: Set[Param]) -> bool:
         for p in ori:
-            assert len(p._refs) < 2
+            # list of unconnected params. Useful when the input is subscriptable
+            unconnected_params: List[Tuple["Param", Optional[int]]] = [ref for ref in p.references if ref[0] not in dst]
             # an input param can be only connected to one output param
-            if p.ref_counter == 0 or p._refs[0] not in dst:
+            if p.ref_counter() == 0 or len(unconnected_params) > 0:
                 return False
         return True
 
@@ -56,11 +54,13 @@ class ComponentsManager(nn.Module):
         # search for connected components
         for out_param in component.outputs:
             # search for the references of each output param across all the component
-            for in_param in out_param._refs:
+            in_param: Tuple["Param", Optional[int]]
+            for in_param in out_param.references:
                 for cmp in self.nodes:
                     if cmp not in self._seq:
-                        # found component with all its inputs connected
-                        if in_param in cmp.inputs and self._all_connected(cmp.inputs, traversed_out_params):
+                        # try to find a component connected with the current component and with all
+                        # its inputs connected
+                        if in_param[0] in cmp.inputs and self._all_connected(cmp.inputs, traversed_out_params):
                             # add component to the execution sequence
                             self._seq.append(cmp)
                             # continue with the traverse

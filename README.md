@@ -14,19 +14,21 @@ You can create pipelines using the as a base the `limbus.Component` as follows:
 # define your components
 c1 = Constant("c1", 1.)
 c2 = Constant("c2", torch.ones(1, 3))
-
 add = Adder("add")
 show = Printer("print")
 
-# create the manager and connect them
-manager = ComponentsManager()
-manager.connect(c1, "out", add, "a")
-manager.connect(c2, "out", add, "b")
-manager.connect(add, "out", show, "inp")
+# connect the components
+c1.outputs.out.connect(add.inputs.a)
+c2.outputs.out.connect(add.inputs.b)
+add.outputs.out.connect(show.inputs.inp)
+
+# create the pipeline and add its nodes
+pipeline = Pipeline()
+pipeline.add_nodes([c1, c2, add, show])
 
 # run your pipeline
-manager.traverse()
-manager.execute(1)
+pipeline.traverse()
+pipeline.execute(1)
 
 torch.allclose(add.outputsout, torch.ones(1, 3) * 2.)
 ```
