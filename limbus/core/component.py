@@ -22,7 +22,7 @@ class ComponentState(Enum):
     DISABLED = 3
 
 
-class NoValue():
+class NoValue:
     """Denote that a param does not have a value."""
     pass
 
@@ -39,9 +39,21 @@ class IterableContainer:
     container: Union[Container, "IterableContainer"]
     index: int
 
+    @property
+    def value(self) -> Any:
+        """Get the value of the container."""
+        if isinstance(self.container, Container):
+            # return the value of the container at the index
+            return self.container.value[self.index]
+        else:
+            # look for the container value.
+            # If it is an IterableContainer means that the final value is nested.
+            assert isinstance(self.container, IterableContainer)
+            return self.container.value
+
 
 class IterableInputContainers:
-    """Denote that a param has an indexed value."""
+    """Denote that an input param is a sequence of Containers."""
     def __init__(self, container: Optional[IterableContainer] = None):
         containers = []
         if container is not None:
