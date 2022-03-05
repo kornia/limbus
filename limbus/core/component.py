@@ -35,7 +35,12 @@ class Container:
 
 @dataclass
 class IterableContainer:
-    """Denote that a param has an indexed value."""
+    """Denote that a param has an indexed value.
+
+    Note: In our use case the maximum number of nested IterableContainers is 2.
+    This number is not explicitly controlled. It is implicitly controlled in the Param class.
+
+    """
     container: Union[Container, "IterableContainer"]
     index: int
 
