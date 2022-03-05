@@ -125,13 +125,12 @@ class IterableParam:
     """Temporal class to manage indexing inside a parameter."""
     def __init__(self, param: "Param", index: int) -> None:
         self._param: Param = param
-        self._index: int = index
-        self._iter_value: Union[IterableContainer, IterableInputContainers]
-        if isinstance(param._value, Container):
-            self._iter_value = IterableContainer(param._value, index)
-        elif isinstance(param._value, IterableInputContainers):
+        self._iter_container: Union[IterableContainer, IterableInputContainers]
+        if isinstance(param.container, Container):
+            self._iter_container = IterableContainer(param.container, index)
+        elif isinstance(param.container, IterableInputContainers):
             # since it is an input, the pointer to the value is not relevant at this stage
-            self._iter_value = IterableContainer(Container(None), index)
+            self._iter_container = IterableContainer(Container(None), index)
 
     @property
     def param(self) -> "Param":
@@ -141,16 +140,33 @@ class IterableParam:
     @property
     def index(self) -> int:
         """Return the selected index in the sequence."""
-        return self._index
+        if isinstance(self._iter_container, IterableInputContainers):
+            raise TypeError("Cannot get the index of a list of input containers.")
+        return self._iter_container.index
 
     @property
-    def value(self) -> Union[IterableContainer, IterableInputContainers]:
-        """Get the value of the parameter."""
-        return self._iter_value
+    def value(self) -> Union[Any, List[Any]]:
+        """Get the value of the parameter.
+
+        It can be a list of values if the parameter is an IterableInputContainers.
+
+        """
+        if isinstance(self._iter_container, IterableContainer):
+            return self._iter_container.value
+        else:
+            assert isinstance(self._iter_container, IterableInputContainers)
+            return self._iter_container.get_ordered()
+
+    @property
+    def iter_container(self) -> Union[IterableContainer, IterableInputContainers]:
+        """Get the container of the parameter."""
+        return self._iter_container
 
     def ref_counter(self) -> int:
         """Return the number of references for this parameter."""
-        return self._param.ref_counter(self._index)
+        if isinstance(self._iter_container, IterableInputContainers):
+            raise TypeError("At this moment the number of references for IterableInputContainers cannot be retrieved.")
+        return self._param.ref_counter(self._iter_container.index)
 
     def connect(self, dst: Union["Param", "IterableParam"]) -> None:
         """Connect this parameter with the dst parameter."""
@@ -207,7 +223,6 @@ class Param:
                 return self._value.value.container.value[self._value.value.index]  # type: ignore
             else:
                 return self._value.value
-            return self._value.value
         elif isinstance(self._value, IterableInputContainers):
             assert self._is_subscriptable
             origin = typing.get_origin(self._type)
