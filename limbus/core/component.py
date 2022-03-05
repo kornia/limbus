@@ -232,6 +232,21 @@ class Param:
         typeguard.check_type(self._name, value, self._type)
         self._value.value = value
 
+    @property
+    def container(self) -> Union[Container, IterableContainer, IterableInputContainers]:
+        """Get the container for this parameter."""
+        return self._value
+
+    @container.setter
+    def container(self, value: Union[Container, IterableContainer, IterableInputContainers]) -> None:
+        """Set the container for this parameter.
+
+        Args:
+            value (Container, IterableContainer or IterableInputContainers): The container to set.
+
+        """
+        self._value = value
+
     def ref_counter(self, index: Optional[int] = None) -> int:
         """Return the number of references for this parameter."""
         if index is not None:
