@@ -290,6 +290,10 @@ class Param:
         if self._is_subscriptable and isinstance(ori, Param):
             raise ValueError(f"The param '{self.name}' must be connected using indexes.")
 
+        if isinstance(dst, Param) and dst._is_subscriptable:
+            raise ValueError(f"The param '{dst.name}' must be connected using indexes.")
+
+
         # TODO: check that dst param is an input param
         # TODO: check type compatibility
         if (isinstance(dst, Param) and dst.ref_counter() > 0):
@@ -302,32 +306,32 @@ class Param:
 
         # connect the param to the dst param
         if isinstance(dst, Param) and isinstance(ori, Param):
-            assert isinstance(dst._value, Container)
-            assert isinstance(ori._value, Container)
-            dst._value = ori._value
+            assert isinstance(dst.container, Container)
+            assert isinstance(ori.container, Container)
+            dst.container = ori.container
         elif isinstance(dst, IterableParam) and isinstance(ori, Param):
-            assert isinstance(dst._iter_value, IterableContainer)
-            assert isinstance(ori._value, Container)
-            dst._iter_value.container = ori._value
+            assert isinstance(dst.iter_container, IterableContainer)
+            assert isinstance(ori.container, Container)
+            dst.iter_container.container = ori.container
         elif isinstance(dst, Param) and isinstance(ori, IterableParam):
-            assert isinstance(dst._value, Container)
-            assert isinstance(ori._iter_value, IterableContainer)
-            dst._value.value = ori._iter_value
+            assert isinstance(dst.container, Container)
+            assert isinstance(ori.iter_container, IterableContainer)
+            dst.container.value = ori.iter_container
         else:
             assert isinstance(dst, IterableParam)
             assert isinstance(ori, IterableParam)
-            assert isinstance(dst._iter_value, IterableContainer)
-            assert isinstance(ori._iter_value, IterableContainer)
-            dst._iter_value.container = ori._iter_value
+            assert isinstance(dst.iter_container, IterableContainer)
+            assert isinstance(ori.iter_container, IterableContainer)
+            dst.iter_container.container = ori.iter_container
 
         # if dest is an IterableParam means that several ori params can be connected to different dest indexes
         # so they should be saved as a set of params
         if isinstance(dst, IterableParam):
-            assert isinstance(dst._iter_value, IterableContainer)
-            if isinstance(dst.param._value, IterableInputContainers):
-                dst.param._value.add(dst._iter_value)
+            assert isinstance(dst.iter_container, IterableContainer)
+            if isinstance(dst.param.container, IterableInputContainers):
+                dst.param.container.add(dst.iter_container)
             else:
-                dst.param._value = IterableInputContainers(dst._iter_value)
+                dst.param.container = IterableInputContainers(dst.iter_container)
 
         self._update_references('add', ori, dst)
 
@@ -338,16 +342,16 @@ class Param:
     def _disconnect(self, ori: Union["Param", IterableParam], dst: Union["Param", IterableParam]) -> None:
         """Disconnect this parameter from the dst parameter."""
         if isinstance(dst, Param):
-            assert isinstance(dst._value, Container)
-            dst._value = Container(NoValue())
+            assert isinstance(dst.container, Container)
+            dst.container = Container(NoValue())
         elif isinstance(dst, IterableParam):
-            if isinstance(dst.param._value, IterableInputContainers):
-                assert isinstance(dst._iter_value, IterableContainer)
-                dst.param._value.remove(dst._iter_value.index)
-                if len(dst.param._value) == 0:
-                    dst.param._value = Container(NoValue())
+            if isinstance(dst.param.container, IterableInputContainers):
+                assert isinstance(dst.iter_container, IterableContainer)
+                dst.param.container.remove(dst.iter_container.index)
+                if len(dst.param.container) == 0:
+                    dst.param.container = Container(NoValue())
             else:
-                dst.param._value = Container(NoValue())
+                dst.param.container = Container(NoValue())
 
         self._update_references('remove', ori, dst)
 
