@@ -405,7 +405,7 @@ class Params(Iterable):
         setattr(self, name, Param(name, tp, value, arg))
 
     def get_related_arg(self, name: str) -> Optional[str]:
-        """Return the Component argument related with a given param.
+        """Return the argument in the Component constructor related with a given param.
 
         Args:
             name: name of the param.
