@@ -169,16 +169,24 @@ class IterableParam:
         return self._param.ref_counter(self._iter_container.index)
 
     def connect(self, dst: Union["Param", "IterableParam"]) -> None:
-        """Connect this parameter with the dst parameter."""
+        """Connect this parameter (output) with the dst (input) parameter."""
         self._param._connect(self, dst)
 
     def disconnect(self, dst: Union["Param", "IterableParam"]) -> None:
-        """Connect this parameter with the dst parameter."""
+        """Disconnect this parameter (output) with the dst (input) parameter."""
         self._param._disconnect(self, dst)
 
 
 class Param:
-    """Class to store data for each parameter."""
+    """Class to store data for each parameter.
+
+    Args:
+        name: name of the parameter.
+        tp (optional): type of the parameter. Madnatory for subscriptable params. Default: Any.
+        value (optional): value of the parameter. Default: NoValue().
+        arg (optional): name of the argument in the component constructor related with this param. Default: None.
+
+    """
     def __init__(self, name: str, tp: Any = Any, value: Any = NoValue(), arg: Optional[str] = None) -> None:
         # validate that the type is coherent with the value
         if not isinstance(value, NoValue):
@@ -286,7 +294,7 @@ class Param:
         return IterableParam(self, index)
 
     def _connect(self, ori: Union["Param", IterableParam], dst: Union["Param", IterableParam]) -> None:
-        """Connect this parameter with the dst parameter."""
+        """Connect this parameter (output) with the dst (input) parameter."""
         if self._is_subscriptable and isinstance(ori, Param):
             raise ValueError(f"The param '{self.name}' must be connected using indexes.")
 
@@ -335,7 +343,7 @@ class Param:
         self._update_references('add', ori, dst)
 
     def connect(self, dst: Union["Param", IterableParam]) -> None:
-        """Connect this parameter with the dst parameter."""
+        """Connect this parameter (output) with the dst (input) parameter."""
         self._connect(self, dst)
 
     def _disconnect(self, ori: Union["Param", IterableParam], dst: Union["Param", IterableParam]) -> None:
@@ -373,7 +381,7 @@ class Param:
             dst._refs[dst_idx].remove((ori, ori_idx))
 
     def disconnect(self, dst: Union["Param", IterableParam]) -> None:
-        """Disconnect this parameter from the dst parameter."""
+        """Disconnect this parameter (output) from the dst (input) parameter."""
         self._disconnect(self, dst)
 
 
