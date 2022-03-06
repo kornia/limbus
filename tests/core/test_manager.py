@@ -58,7 +58,6 @@ def test_pipeline_iterable():
     show0 = Printer("print0")
     c1.outputs.out.connect(unbind.inputs.input)
     c2.outputs.out.connect(unbind.inputs.dim)
-    assert unbind.outputs.get_params() == []
     unbind.outputs.out.select(0).connect(show0.inputs.inp)
     manager = Pipeline()
     manager.add_nodes([c1, c2, unbind, show0])
