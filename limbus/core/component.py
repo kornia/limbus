@@ -293,7 +293,6 @@ class Param:
         if isinstance(dst, Param) and dst._is_subscriptable:
             raise ValueError(f"The param '{dst.name}' must be connected using indexes.")
 
-
         # TODO: check that dst param is an input param
         # TODO: check type compatibility
         if (isinstance(dst, Param) and dst.ref_counter() > 0):

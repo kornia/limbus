@@ -35,7 +35,7 @@ def test_pipeline_simple_graph():
     show0 = Printer("print0")
     c1.outputs.out.connect(show0.inputs.inp)
     manager = Pipeline()
-    manager.add_nodes([c1, c2])
+    manager.add_nodes([c1, show0])
     manager.traverse()
     manager.execute(1)
 

@@ -30,7 +30,7 @@ class TestIterableContainer:
         c = IterableContainer(Container([1, 2]), 0)
         assert c.value == 1
         assert c.index == 0
-        assert c.container.value == [1,2]
+        assert c.container.value == [1, 2]
 
 
 class TestIterableInputContainers:
@@ -302,7 +302,6 @@ class TestParam:
         p0 = Param("a", typing.List[int], value=[1, 2])
         p1 = Param("b")
         p2 = Param("c")
-        p3 = Param("d")
         p0.select(0).connect(p1)
         p0.select(1).connect(p2)
         assert p1.ref_counter() == 1
