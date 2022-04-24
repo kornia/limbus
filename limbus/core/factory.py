@@ -1,10 +1,12 @@
 """Module containing the basic functions to create components automatically."""
-
 import inspect
 from typing import Callable, Union, Dict, Any, cast, List, TypedDict, Optional, NamedTuple, Tuple
 import importlib
+from importlib.machinery import ModuleSpec
+from importlib.abc import Loader
 import logging
 import types
+from pathlib import Path
 
 import yaml
 import typeguard
@@ -413,3 +415,29 @@ def register_component(cls: Component, dst_module: str) -> None:
         # if the component belong to a module...
         _add_modules_to_globals([module], dst_module)
     globals[cls.__name__] = cls  # type: ignore  # mypy does not recognise __name__ as str
+
+
+def register_components_from_path(file_name: str) -> None:
+    """Register already existing components defined in a python module.
+
+    NOTE: the destination module will be the filename without the extension.
+          i.e. limbus.components.{filename}
+
+    Args:
+        file_name: name of the python module containing the components.
+
+    """
+    dst_module: str = Path(file_name).stem
+    # create the module path inside "limbus.components"
+    spec: Optional[ModuleSpec] = importlib.util.spec_from_file_location(f"limbus.components.{dst_module}", file_name)
+    if spec is None or spec.loader is None:
+        raise ValueError(f"The module {file_name} could not be imported.")
+    module = importlib.util.module_from_spec(spec)
+    assert isinstance(spec.loader, Loader)
+    spec.loader.exec_module(module)
+    # get access to all the components in the module
+    globals = COMP_GLOBALS
+    if module not in globals:
+        globals[dst_module] = module
+    else:
+        raise ValueError(f"Module {dst_module} already exists in 'limbus.components'.")
