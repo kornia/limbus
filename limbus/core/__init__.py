@@ -1,7 +1,7 @@
 from limbus.core.component import Component, ComponentState, Params, NoValue, Param
 from limbus.core.manager import DefaultParam, Pipeline
-from limbus.core.factory import (
-    ComponentDefinition, register_components, register_component, register_components_from_yml)
+from limbus.core.factory import (ComponentDefinition, register_components, register_component,
+                                 register_components_from_yml, register_components_from_path)
 
 __all__ = [
     "Pipeline",
@@ -13,5 +13,6 @@ __all__ = [
     "register_components",
     "register_component",
     "register_components_from_yml",
+    "register_components_from_path",
     "ComponentDefinition",
     "NoValue"]
