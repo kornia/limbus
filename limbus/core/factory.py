@@ -445,14 +445,11 @@ def register_components_from_path(file_name: str) -> None:
 
 def deregister_all_components() -> None:
     """Remove all the registered component from the registry."""
-
     default_modules: List[str] = [cmp.split(".")[0] for cmp in COMP_GLOBALS["DEFAULT_COMPONENT_FILES"]]
 
     modules_with_components: List[str] = []
     for k, v in COMP_GLOBALS.items():
-        if (inspect.ismodule(v) and 
-                k not in COMP_GLOBALS["IMPORTED_MODULES"] and
-                k not in default_modules):
+        if inspect.ismodule(v) and k not in COMP_GLOBALS["IMPORTED_MODULES"] and k not in default_modules:
             modules_with_components.append(k)
 
     for k in modules_with_components:
