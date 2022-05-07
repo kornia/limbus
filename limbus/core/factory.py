@@ -389,7 +389,7 @@ def register_components_from_yml(file_name: str) -> None:
 
 
 def register_component(cls: Component, dst_module: str) -> None:
-    """Register a already created component in a concrete location.
+    """Register a already created component in a concrete module inside limbus.
 
     Args:
         cls: class to be registered.
@@ -417,7 +417,7 @@ def register_component(cls: Component, dst_module: str) -> None:
     globals[cls.__name__] = cls  # type: ignore  # mypy does not recognise __name__ as str
 
 
-def register_components_from_path(file_name: str) -> None:
+def register_components_from_module(file_name: str) -> None:
     """Register already existing components defined in a python module.
 
     NOTE: the destination module will be the filename without the extension.

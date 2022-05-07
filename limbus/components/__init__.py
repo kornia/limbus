@@ -6,7 +6,7 @@ from limbus.core import factory
 factory.COMP_GLOBALS = globals()
 
 from limbus.core import Component  # noqa: E402
-from limbus.core import register_components_from_yml, register_components_from_path, register_component  # noqa: E402
+from limbus.core import register_components_from_yml, register_components_from_module, register_component  # noqa: E402
 
 # IMPORTANT NOTE: In order to be able to deregister components with safety we need to list all the imported modules.
 IMPORTED_MODULES = ["factory"]
@@ -17,6 +17,6 @@ DEFAULT_COMPONENT_FILES = ["torch.yml", "kornia.yml", "base.py"]
 for comp_file in DEFAULT_COMPONENT_FILES:
     path = Path(__file__).parent / comp_file
     if path.suffix == ".py":
-        register_components_from_path(str(path))
+        register_components_from_module(str(path))
     else:
         register_components_from_yml(str(path))

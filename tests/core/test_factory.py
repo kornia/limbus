@@ -1,10 +1,36 @@
 from pathlib import Path
 
+import pytest
 import torch
 
 import limbus.components
 from limbus.core import Component, ComponentState, Params
 from limbus import core
+
+
+class Subs(Component):
+    """Component to add two inputs and output the result."""
+    def __init__(self, name: str):
+        super().__init__(name)
+
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
+        inputs = Params()
+        inputs.declare("a", torch.Tensor)
+        inputs.declare("b", torch.Tensor)
+        return inputs
+
+    @staticmethod
+    def register_outputs() -> Params:  # noqa: D102
+        outputs = Params()
+        outputs.declare("out", torch.Tensor)
+        return outputs
+
+    def forward(self) -> ComponentState:  # noqa: D102
+        a = self.inputs.get_param("a")
+        b = self.inputs.get_param("b")
+        self._outputs.set_param("out", a - b)
+        return ComponentState.OK
 
 
 def test_registry():
@@ -116,3 +142,63 @@ def test_registry_from_yml_only_name(tmpdir_factory):
     comp.inputs.set_param("dim", 2)
     comp()
     assert comp.outputs.get_param("out").shape == torch.Size([2, 3, 1])
+
+
+@pytest.fixture(scope="module")
+def my_components_module(tmpdir_factory):
+    fn = str(Path(tmpdir_factory.mktemp("my_components_module")) / "test.py")
+    with open(fn, "w") as f:
+        f.write("""
+import torch
+
+from limbus.core import Component, ComponentState, Params
+
+class Subs(Component):
+    def __init__(self, name: str):
+        super().__init__(name)
+
+    @staticmethod
+    def register_inputs() -> Params:  # noqa: D102
+        inputs = Params()
+        inputs.declare("a", torch.Tensor)
+        inputs.declare("b", torch.Tensor)
+        return inputs
+
+    @staticmethod
+    def register_outputs() -> Params:  # noqa: D102
+        outputs = Params()
+        outputs.declare("out", torch.Tensor)
+        return outputs
+
+    def forward(self) -> ComponentState:  # noqa: D102
+        a = self.inputs.get_param("a")
+        b = self.inputs.get_param("b")
+        self._outputs.set_param("out", a - b)
+        return ComponentState.OK
+    """)
+    return fn
+
+def test_registry_from_module(my_components_module):
+    core.register_components_from_module(str(my_components_module))
+    comp = limbus.components.test.Subs("test")
+    comp.inputs.set_param("a", torch.tensor(3))
+    comp.inputs.set_param("b", torch.tensor(2))
+    comp()
+    assert comp.outputs.get_param("out") == torch.tensor(1)
+
+
+def test_deregistry_all(my_components_module):
+    core.register_components_from_module(str(my_components_module))
+    comp = limbus.components.test.Subs("test")
+    comp.inputs.set_param("a", torch.tensor(3))
+    comp.inputs.set_param("b", torch.tensor(2))
+    comp()
+
+    core.deregister_all_components()
+    with pytest.raises(AttributeError):
+        limbus.components.test.Subs("test")
+
+    # check default modules
+    dir(limbus.components.torch)
+    dir(limbus.components.kornia)
+    dir(limbus.components.base)
