@@ -24,6 +24,8 @@ class Pipeline(nn.Module):
     def __init__(self):
         self.nodes: Set[Component] = set()
         self._seq: List[Component] = []
+        self._counter = 0  # iterations counter
+        self._pause: bool = False
 
     def add_nodes(self, components: Union[Component, List[Component]]) -> None:
         """Add components to the pipeline.
@@ -78,20 +80,27 @@ class Pipeline(nn.Module):
                 self._seq.append(component)
                 self._traverse(component, traversed_out_params)
 
-    def execute(self, iters: Optional[int] = None) -> None:
+    def pause(self) -> None:
+        """Pause the execution of the pipeline once the current iteration finishes."""
+        self._pause = True
+
+    def execute(self, iters: Optional[int] = None) -> ComponentState:
         """Execute the components graph.
 
         Args:
             iters (optional): number of iters to be run. By default all of them are run.
 
+        Returns:
+            ComponentsState that has the state of the execution.
+
         """
         state = ComponentState.STOPPED
-        count = 1
-        while True:
-            if iters is not None and iters < count:
+        counter = self._counter - 1
+        while not self._pause:
+            if iters is not None and iters + counter < self._counter:
                 break
-            log.info(f"Iteration {count}")
-            count += 1
+            log.info(f"Iteration {self._counter}")
+            self._counter += 1
             for obj in self._seq:
                 # check data types for the input params (probably this check can be removed)
                 for p in obj.inputs:
@@ -115,3 +124,5 @@ class Pipeline(nn.Module):
                 log.info("DONE")
                 break
             time.sleep(2)
+        self._pause = False
+        return state

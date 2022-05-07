@@ -1,4 +1,4 @@
-from limbus.core import Pipeline
+from limbus.core import Pipeline, ComponentState
 import limbus.components
 from limbus.components.base import Constant, Printer, Adder
 
@@ -25,7 +25,8 @@ def test_pipeline():
     manager = Pipeline()
     manager.add_nodes([c1, c2, add, show])
     manager.traverse()
-    manager.execute(1)
+    out = manager.execute(1)
+    assert isinstance(out, ComponentState)
 
     torch.allclose(add.outputs.out.value, torch.ones(1, 3) * 3.)
 
@@ -37,7 +38,8 @@ def test_pipeline_simple_graph():
     manager = Pipeline()
     manager.add_nodes([c1, show0])
     manager.traverse()
-    manager.execute(1)
+    out = manager.execute(1)
+    assert isinstance(out, ComponentState)
 
 
 def test_pipeline_disconnected_components():
@@ -48,7 +50,8 @@ def test_pipeline_disconnected_components():
     manager = Pipeline()
     manager.add_nodes([c1, show0])
     manager.traverse()
-    manager.execute(1)
+    out = manager.execute(1)
+    assert isinstance(out, ComponentState)
 
 
 def test_pipeline_iterable():
@@ -62,4 +65,33 @@ def test_pipeline_iterable():
     manager = Pipeline()
     manager.add_nodes([c1, c2, unbind, show0])
     manager.traverse()
-    manager.execute(1)
+    out = manager.execute(1)
+    assert isinstance(out, ComponentState)
+
+
+def test_pipeline_pause():
+    c1 = Constant("c1", torch.rand(2, 3))
+    show0 = Printer("print0")
+    c1.outputs.out.connect(show0.inputs.inp)
+    manager = Pipeline()
+    manager.add_nodes([c1, show0])
+    manager.traverse()
+    manager.pause()
+    assert manager._pause is True
+    out = manager.execute(1)
+    assert manager._pause is False
+    assert isinstance(out, ComponentState)
+    assert out == ComponentState.STOPPED
+    assert manager._counter == 0
+
+
+def test_pipeline_counter():
+    c1 = Constant("c1", torch.rand(2, 3))
+    show0 = Printer("print0")
+    c1.outputs.out.connect(show0.inputs.inp)
+    manager = Pipeline()
+    manager.add_nodes([c1, show0])
+    manager.traverse()
+    out = manager.execute(2)
+    assert isinstance(out, ComponentState)
+    assert manager._counter == 2

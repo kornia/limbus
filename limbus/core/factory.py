@@ -1,10 +1,12 @@
 """Module containing the basic functions to create components automatically."""
-
 import inspect
 from typing import Callable, Union, Dict, Any, cast, List, TypedDict, Optional, NamedTuple, Tuple
 import importlib
+from importlib.machinery import ModuleSpec
+from importlib.abc import Loader
 import logging
 import types
+from pathlib import Path
 
 import yaml
 import typeguard
@@ -12,7 +14,6 @@ import torch.fx
 import torch.nn as nn
 
 from limbus.core import Component, ComponentState, Params, NoValue
-from zmq import EVENT_CLOSE_FAILED
 
 
 logging.basicConfig(level=logging.INFO)
@@ -387,7 +388,7 @@ def register_components_from_yml(file_name: str) -> None:
 
 
 def register_component(cls: Component, dst_module: str) -> None:
-    """Register a already created component in a concrete location.
+    """Register a already created component in a concrete module inside limbus.
 
     Args:
         cls: class to be registered.
@@ -413,3 +414,63 @@ def register_component(cls: Component, dst_module: str) -> None:
         # if the component belong to a module...
         _add_modules_to_globals([module], dst_module)
     globals[cls.__name__] = cls  # type: ignore  # mypy does not recognise __name__ as str
+
+
+def register_components_from_module(file_name: str) -> None:
+    """Register already existing components defined in a python module.
+
+    NOTE: the destination module will be the filename without the extension.
+          i.e. limbus.components.{filename}
+
+    Args:
+        file_name: name of the python module containing the components.
+
+    """
+    dst_module: str = Path(file_name).stem
+    # create the module path inside "limbus.components"
+    spec: Optional[ModuleSpec] = importlib.util.spec_from_file_location(f"limbus.components.{dst_module}", file_name)
+    if spec is None or spec.loader is None:
+        raise ValueError(f"The module {file_name} could not be imported.")
+    module = importlib.util.module_from_spec(spec)
+    assert isinstance(spec.loader, Loader)
+    spec.loader.exec_module(module)
+    # get access to all the components in the module
+    globals = COMP_GLOBALS
+    if module not in globals:
+        globals[dst_module] = module
+    else:
+        raise ValueError(f"Module {dst_module} already exists in 'limbus.components'.")
+
+
+def register_components_from_path(file_name: str) -> None:
+    """Register components from yml or modules.
+
+    This is a high level interface to register components that internally calls
+        register_components_from_module() or register_components_from_yml()
+
+    NOTE: from a module the destination module will be the filename without the extension.
+        i.e. limbus.components.{filename}
+
+    Args:
+        file_name: name of the python module or yml file containing the components.
+
+    """
+    if Path(file_name).suffix == ".yml":
+        register_components_from_yml(file_name)
+    elif Path(file_name).suffix == ".py":
+        register_components_from_module(file_name)
+    else:
+        raise ValueError(f"The file '{file_name}' must be a .yml or .py file.")
+
+
+def deregister_all_components() -> None:
+    """Remove all the registered component from the registry."""
+    default_modules: List[str] = [cmp.split(".")[0] for cmp in COMP_GLOBALS["DEFAULT_COMPONENT_FILES"]]
+
+    modules_with_components: List[str] = []
+    for k, v in COMP_GLOBALS.items():
+        if inspect.ismodule(v) and k not in COMP_GLOBALS["IMPORTED_MODULES"] and k not in default_modules:
+            modules_with_components.append(k)
+
+    for k in modules_with_components:
+        COMP_GLOBALS.pop(k)
