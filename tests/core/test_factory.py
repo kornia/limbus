@@ -35,30 +35,6 @@ class Subs(Component):
 
 def test_registry():
     # Example of a simple component created from the API
-    class Subs(Component):
-        """Component to add two inputs and output the result."""
-        def __init__(self, name: str):
-            super().__init__(name)
-
-        @staticmethod
-        def register_inputs() -> Params:  # noqa: D102
-            inputs = Params()
-            inputs.declare("a", torch.Tensor)
-            inputs.declare("b", torch.Tensor)
-            return inputs
-
-        @staticmethod
-        def register_outputs() -> Params:  # noqa: D102
-            outputs = Params()
-            outputs.declare("out", torch.Tensor)
-            return outputs
-
-        def forward(self) -> ComponentState:  # noqa: D102
-            a = self.inputs.get_param("a")
-            b = self.inputs.get_param("b")
-            self._outputs.set_param("out", a - b)
-            return ComponentState.OK
-
     core.register_component(Subs, "test0.test1")
     subs = limbus.components.test0.test1.Subs("name")  # type: ignore
 
@@ -145,6 +121,16 @@ def test_registry_from_yml_only_name(tmpdir_factory):
 
 
 @pytest.fixture(scope="module")
+def my_components_yml(tmpdir_factory):
+    fn = str(Path(tmpdir_factory.mktemp("my_components_yml")) / "test.yml")
+    with open(fn, "w") as f:
+        f.write("""
+            inspect.isclass:
+    """)
+    return fn
+
+
+@pytest.fixture(scope="module")
 def my_components_module(tmpdir_factory):
     fn = str(Path(tmpdir_factory.mktemp("my_components_module")) / "test.py")
     with open(fn, "w") as f:
@@ -178,6 +164,7 @@ class Subs(Component):
     """)
     return fn
 
+
 def test_registry_from_module(my_components_module):
     core.register_components_from_module(str(my_components_module))
     comp = limbus.components.test.Subs("test")
@@ -185,6 +172,14 @@ def test_registry_from_module(my_components_module):
     comp.inputs.set_param("b", torch.tensor(2))
     comp()
     assert comp.outputs.get_param("out") == torch.tensor(1)
+
+
+@pytest.mark.parametrize("path, func", [("my_components_module", "test.Subs"),
+                                        ("my_components_yml", "inspect.isclass")])
+def test_registry_from_path(path, func, request):
+    path = request.getfixturevalue(path)
+    core.register_components_from_path(str(path))
+    eval(f"limbus.components.{func}")
 
 
 def test_deregistry_all(my_components_module):

@@ -14,7 +14,6 @@ import torch.fx
 import torch.nn as nn
 
 from limbus.core import Component, ComponentState, Params, NoValue
-from zmq import EVENT_CLOSE_FAILED
 
 
 logging.basicConfig(level=logging.INFO)
@@ -441,6 +440,27 @@ def register_components_from_module(file_name: str) -> None:
         globals[dst_module] = module
     else:
         raise ValueError(f"Module {dst_module} already exists in 'limbus.components'.")
+
+
+def register_components_from_path(file_name: str) -> None:
+    """Register components from yml or modules.
+
+    This is a high level interface to register components that internally calls
+        register_components_from_module() or register_components_from_yml()
+
+    NOTE: from a module the destination module will be the filename without the extension.
+        i.e. limbus.components.{filename}
+
+    Args:
+        file_name: name of the python module or yml file containing the components.
+
+    """
+    if Path(file_name).suffix == ".yml":
+        register_components_from_yml(file_name)
+    elif Path(file_name).suffix == ".py":
+        register_components_from_module(file_name)
+    else:
+        raise ValueError(f"The file '{file_name}' must be a .yml or .py file.")
 
 
 def deregister_all_components() -> None:
