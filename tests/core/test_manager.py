@@ -81,7 +81,7 @@ def test_pipeline_pause():
     out = manager.execute(1)
     assert manager._pause is False
     assert isinstance(out, ComponentState)
-    assert out == ComponentState.STOPPED
+    assert out == ComponentState.PAUSED
     assert manager._counter == 0
 
 

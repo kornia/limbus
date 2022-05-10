@@ -43,10 +43,10 @@ class Pipeline(nn.Module):
 
     def set_after_component_hook(self, hook: Optional[Callable]) -> None:
         """Set a hook to be executed after each component.
-        
+
         This callable must have 2 parameters which are the component being executed and its state
         after the execution. Moreover it must be async.
-        
+
         Prototype: async def hook_name(obj: Componet, state: ComponentState).
         """
         self._after_component_hook = hook
