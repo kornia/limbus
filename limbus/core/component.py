@@ -16,6 +16,7 @@ import numpy as np
 class ComponentState(Enum):
     """Possible states for the components."""
     STOPPED = 0
+    PAUSED = 4
     OK = 1
     NotImplemented = -1
     ERROR = 2

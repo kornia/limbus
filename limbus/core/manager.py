@@ -1,7 +1,8 @@
 """Components manager to connect, traverse and execute pipelines."""
-from typing import List, Optional, Union, Set, Tuple
+from typing import List, Optional, Union, Set, Tuple, Callable
 import logging
 import time
+import asyncio
 
 import typeguard
 import torch.nn as nn
@@ -26,6 +27,29 @@ class Pipeline(nn.Module):
         self._seq: List[Component] = []
         self._counter = 0  # iterations counter
         self._pause: bool = False
+
+        self._before_component_hook: Optional[Callable] = None
+        self._after_component_hook: Optional[Callable] = None
+
+    def set_before_component_hook(self, hook: Optional[Callable]) -> None:
+        """Set a hook to be executed before each component.
+
+        This callable must have a single parameter which is the component being executed.
+         Moreover it must be async.
+
+        Prototype: async def hook_name(obj: Componet).
+        """
+        self._before_component_hook = hook
+
+    def set_after_component_hook(self, hook: Optional[Callable]) -> None:
+        """Set a hook to be executed after each component.
+        
+        This callable must have 2 parameters which are the component being executed and its state
+        after the execution. Moreover it must be async.
+        
+        Prototype: async def hook_name(obj: Componet, state: ComponentState).
+        """
+        self._after_component_hook = hook
 
     def add_nodes(self, components: Union[Component, List[Component]]) -> None:
         """Add components to the pipeline.
@@ -84,8 +108,8 @@ class Pipeline(nn.Module):
         """Pause the execution of the pipeline once the current iteration finishes."""
         self._pause = True
 
-    def execute(self, iters: Optional[int] = None) -> ComponentState:
-        """Execute the components graph.
+    async def async_execute(self, iters: Optional[int] = None) -> ComponentState:
+        """Execute the components graph with hooks.
 
         Args:
             iters (optional): number of iters to be run. By default all of them are run.
@@ -94,7 +118,9 @@ class Pipeline(nn.Module):
             ComponentsState that has the state of the execution.
 
         """
-        state = ComponentState.STOPPED
+        state: ComponentState = ComponentState.STOPPED
+        if self._pause:
+            state = ComponentState.PAUSED
         counter = self._counter - 1
         while not self._pause:
             if iters is not None and iters + counter < self._counter:
@@ -105,8 +131,15 @@ class Pipeline(nn.Module):
                 # check data types for the input params (probably this check can be removed)
                 for p in obj.inputs:
                     typeguard.check_type(f"{obj.name}.{p.name}", p.type, p.value)
+
+                if self._before_component_hook is not None:
+                    await self._before_component_hook(obj)
+
                 # exec the component
                 state = obj()
+
+                if self._after_component_hook is not None:
+                    await self._after_component_hook(obj, state)
 
                 if state == ComponentState.STOPPED:
                     log.info(f"Component {obj.name} stopped the pipeline.")
@@ -126,3 +159,15 @@ class Pipeline(nn.Module):
             time.sleep(2)
         self._pause = False
         return state
+
+    def execute(self, iters: Optional[int] = None) -> ComponentState:
+        """Execute the components graph.
+
+        Args:
+            iters (optional): number of iters to be run. By default all of them are run.
+
+        Returns:
+            ComponentsState that has the state of the execution.
+
+        """
+        return asyncio.run(self.async_execute(iters))
