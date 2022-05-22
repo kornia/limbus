@@ -165,7 +165,7 @@ class Pipeline(nn.Module):
         if self._pause:
             state = ComponentState.PAUSED
         counter = self._counter - 1
-        
+
         if self._counter == 0 and self._before_pipeline_hook is not None:
             await self._before_pipeline_hook()
         while not self._pause:
