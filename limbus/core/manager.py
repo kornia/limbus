@@ -30,12 +30,34 @@ class Pipeline(nn.Module):
 
         self._before_component_hook: Optional[Callable] = None
         self._after_component_hook: Optional[Callable] = None
+        self._before_iteration_hook: Optional[Callable] = None
+        self._after_iteration_hook: Optional[Callable] = None
+
+    def set_before_iteration_hook(self, hook: Optional[Callable]) -> None:
+        """Set a hook to be executed before each iteration.
+
+        This callable must have a single parameter which is an int denoting the iter being executed.
+        Moreover it must be async.
+
+        Prototype: async def hook_name(counter: int).
+        """
+        self._before_iteration_hook = hook
+
+    def set_after_iteration_hook(self, hook: Optional[Callable]) -> None:
+        """Set a hook to be executed after each iteration.
+
+        This callable must have a single parameter which is the state of the pipeline at the endo of the iteration.
+        Moreover it must be async.
+
+        Prototype: async def hook_name(state: ComponentState).
+        """
+        self._after_iteration_hook = hook
 
     def set_before_component_hook(self, hook: Optional[Callable]) -> None:
         """Set a hook to be executed before each component.
 
         This callable must have a single parameter which is the component being executed.
-         Moreover it must be async.
+        Moreover it must be async.
 
         Prototype: async def hook_name(obj: Componet).
         """
@@ -126,6 +148,8 @@ class Pipeline(nn.Module):
             if iters is not None and iters + counter < self._counter:
                 break
             log.info(f"Iteration {self._counter}")
+            if self._before_iteration_hook is not None:
+                await self._before_iteration_hook(self._counter)
             self._counter += 1
             for obj in self._seq:
                 # check data types for the input params (probably this check can be removed)
@@ -153,6 +177,8 @@ class Pipeline(nn.Module):
             # code to run before running the next iteration in the pipeline
             for obj in self._seq:
                 obj.finish_iter()
+            if self._after_iteration_hook is not None:
+                await self._after_iteration_hook(state)
             if state == ComponentState.STOPPED:
                 log.info("DONE")
                 break
