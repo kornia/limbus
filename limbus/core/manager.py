@@ -18,6 +18,7 @@ class PipelineState(Enum):
     PAUSED = 2
     ERROR = 3
     EMPTY = 4
+    RUNNING = 5
 
 
 logging.basicConfig(level=logging.INFO)
@@ -217,23 +218,31 @@ class Pipeline(nn.Module):
                 if state == ComponentState.ERROR:
                     log.error(f"Component {obj.name} produced an ERROR.")
                     break
+                if state == ComponentState.NotImplemented:
+                    log.error(f"Component {obj.name} returned a NotImplemented state.")
+                    break
 
             # code to run before running the next iteration in the pipeline
             for obj in self._seq:
                 obj.finish_iter()
             if self._after_iteration_hook is not None:
-                await self._after_iteration_hook(state)
+                if state == ComponentState.STOPPED:
+                    await self._after_iteration_hook(PipelineState.ENDED)
+                elif state in [ComponentState.ERROR, ComponentState.NotImplemented]:
+                    await self._after_iteration_hook(PipelineState.ERROR)
+                else:
+                    await self._after_iteration_hook(PipelineState.RUNNING)
 
             # determine if the pipeline execution has finished
-            if state == ComponentState.STOPPED or state == ComponentState.ERROR:
-                if self._after_pipeline_hook is not None:
-                    await self._after_pipeline_hook(state)
+            if state in  [ComponentState.STOPPED, ComponentState.ERROR, ComponentState.NotImplemented]:
                 if state == ComponentState.STOPPED:
                     pipe_state = PipelineState.ENDED
                     log.info("Pipeline finished.")
-                if state == ComponentState.ERROR:
+                if state in [ComponentState.ERROR, ComponentState.NotImplemented]:
                     log.info("Pipeline finished with an error.")
                     pipe_state = PipelineState.ERROR
+                if self._after_pipeline_hook is not None:
+                    await self._after_pipeline_hook(pipe_state)
                 break
             time.sleep(2)
         self._pause = False
