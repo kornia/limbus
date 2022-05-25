@@ -3,11 +3,21 @@ from typing import List, Optional, Union, Set, Tuple, Callable
 import logging
 import time
 import asyncio
+from enum import Enum
 
 import typeguard
 import torch.nn as nn
 
 from limbus.core import ComponentState, Component, Params, Param
+
+
+class PipelineState(Enum):
+    """Possible states for the pipeline."""
+    STARTED = 0
+    ENDED = 1
+    PAUSED = 2
+    ERROR = 3
+    EMPTY = 4
 
 
 logging.basicConfig(level=logging.INFO)
@@ -38,9 +48,10 @@ class Pipeline(nn.Module):
     def set_before_pipeline_hook(self, hook: Optional[Callable]) -> None:
         """Set a hook to be executed before the pipeline execution.
 
-        This callable does not have any parameter. The only requirements is that it must be async.
+        This callable must have a single parameter which is the state of the pipeline at the begining of the pipeline.
+        The only requirements is that it must be async.
 
-        Prototype: async def hook_name(state: ComponentState).
+        Prototype: async def hook_name(state: PipelineState).
         """
         self._before_pipeline_hook = hook
 
@@ -50,7 +61,7 @@ class Pipeline(nn.Module):
         This callable must have a single parameter which is the state of the pipeline at the end of the pipeline.
         Moreover it must be async.
 
-        Prototype: async def hook_name(state: ComponentState).
+        Prototype: async def hook_name(state: PipelineState).
         """
         self._after_pipeline_hook = hook
 
@@ -67,10 +78,10 @@ class Pipeline(nn.Module):
     def set_after_iteration_hook(self, hook: Optional[Callable]) -> None:
         """Set a hook to be executed after each iteration.
 
-        This callable must have a single parameter which is the state of the pipeline at the endo of the iteration.
+        This callable must have a single parameter which is the state of the pipeline at the end of the iteration.
         Moreover it must be async.
 
-        Prototype: async def hook_name(state: ComponentState).
+        Prototype: async def hook_name(state: PipelineState).
         """
         self._after_iteration_hook = hook
 
@@ -151,23 +162,32 @@ class Pipeline(nn.Module):
         """Pause the execution of the pipeline once the current iteration finishes."""
         self._pause = True
 
-    async def async_execute(self, iters: Optional[int] = None) -> ComponentState:
+    async def async_execute(self, iters: Optional[int] = None) -> PipelineState:
         """Execute the components graph with hooks.
 
         Args:
             iters (optional): number of iters to be run. By default all of them are run.
 
         Returns:
-            ComponentsState that has the state of the execution.
+            PipelineState with the current pipeline status.
 
         """
-        state: ComponentState = ComponentState.STOPPED
+        pipe_state: PipelineState = PipelineState.STARTED
         if self._pause:
-            state = ComponentState.PAUSED
-        counter = self._counter - 1
+            pipe_state = PipelineState.PAUSED
+
+        if len(self._seq) == 0:
+            log.error("The pipeline is empty, it does not contain components to execute.")
+            pipe_state = PipelineState.EMPTY
 
         if self._counter == 0 and self._before_pipeline_hook is not None:
-            await self._before_pipeline_hook()
+            await self._before_pipeline_hook(pipe_state)
+
+        # stop execution if the pipeline is empty
+        if pipe_state == PipelineState.EMPTY:
+            return pipe_state
+
+        counter = self._counter - 1
         while not self._pause:
             if iters is not None and iters + counter < self._counter:
                 break
@@ -209,22 +229,24 @@ class Pipeline(nn.Module):
                 if self._after_pipeline_hook is not None:
                     await self._after_pipeline_hook(state)
                 if state == ComponentState.STOPPED:
+                    pipe_state = PipelineState.ENDED
                     log.info("Pipeline finished.")
                 if state == ComponentState.ERROR:
                     log.info("Pipeline finished with an error.")
+                    pipe_state = PipelineState.ERROR
                 break
             time.sleep(2)
         self._pause = False
-        return state
+        return pipe_state
 
-    def execute(self, iters: Optional[int] = None) -> ComponentState:
+    def execute(self, iters: Optional[int] = None) -> PipelineState:
         """Execute the components graph.
 
         Args:
             iters (optional): number of iters to be run. By default all of them are run.
 
         Returns:
-            ComponentsState that has the state of the execution.
+            PipelineState with the current pipeline status.
 
         """
         return asyncio.run(self.async_execute(iters))
