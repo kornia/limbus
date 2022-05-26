@@ -234,7 +234,7 @@ class Pipeline(nn.Module):
                     await self._after_iteration_hook(PipelineState.RUNNING)
 
             # determine if the pipeline execution has finished
-            if state in  [ComponentState.STOPPED, ComponentState.ERROR, ComponentState.NotImplemented]:
+            if state in [ComponentState.STOPPED, ComponentState.ERROR, ComponentState.NotImplemented]:
                 if state == ComponentState.STOPPED:
                     pipe_state = PipelineState.ENDED
                     log.info("Pipeline finished.")
@@ -244,7 +244,6 @@ class Pipeline(nn.Module):
                 if self._after_pipeline_hook is not None:
                     await self._after_pipeline_hook(pipe_state)
                 break
-            time.sleep(2)
         self._pause = False
         return pipe_state
 
