@@ -19,6 +19,7 @@ class PipelineState(Enum):
     ERROR = 3
     EMPTY = 4
     RUNNING = 5
+    INITIALIZING = 6
 
 
 logging.basicConfig(level=logging.INFO)
