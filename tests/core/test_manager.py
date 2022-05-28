@@ -1,4 +1,4 @@
-from limbus.core import Pipeline, ComponentState
+from limbus.core import Pipeline, PipelineState
 import limbus.components
 from limbus.components.base import Constant, Printer, Adder
 
@@ -26,7 +26,7 @@ def test_pipeline():
     manager.add_nodes([c1, c2, add, show])
     manager.traverse()
     out = manager.execute(1)
-    assert isinstance(out, ComponentState)
+    assert isinstance(out, PipelineState)
 
     torch.allclose(add.outputs.out.value, torch.ones(1, 3) * 3.)
 
@@ -39,7 +39,7 @@ def test_pipeline_simple_graph():
     manager.add_nodes([c1, show0])
     manager.traverse()
     out = manager.execute(1)
-    assert isinstance(out, ComponentState)
+    assert isinstance(out, PipelineState)
 
 
 def test_pipeline_disconnected_components():
@@ -51,7 +51,7 @@ def test_pipeline_disconnected_components():
     manager.add_nodes([c1, show0])
     manager.traverse()
     out = manager.execute(1)
-    assert isinstance(out, ComponentState)
+    assert isinstance(out, PipelineState)
 
 
 def test_pipeline_iterable():
@@ -66,7 +66,7 @@ def test_pipeline_iterable():
     manager.add_nodes([c1, c2, unbind, show0])
     manager.traverse()
     out = manager.execute(1)
-    assert isinstance(out, ComponentState)
+    assert isinstance(out, PipelineState)
 
 
 def test_pipeline_pause():
@@ -80,8 +80,8 @@ def test_pipeline_pause():
     assert manager._pause is True
     out = manager.execute(1)
     assert manager._pause is False
-    assert isinstance(out, ComponentState)
-    assert out == ComponentState.STOPPED
+    assert isinstance(out, PipelineState)
+    assert out == PipelineState.PAUSED
     assert manager._counter == 0
 
 
@@ -93,5 +93,5 @@ def test_pipeline_counter():
     manager.add_nodes([c1, show0])
     manager.traverse()
     out = manager.execute(2)
-    assert isinstance(out, ComponentState)
+    assert isinstance(out, PipelineState)
     assert manager._counter == 2
