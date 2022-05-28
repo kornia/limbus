@@ -15,12 +15,12 @@ import numpy as np
 
 class ComponentState(Enum):
     """Possible states for the components."""
-    STOPPED = 0
-    PAUSED = 4
-    OK = 1
     NotImplemented = -1
-    ERROR = 2
-    DISABLED = 3
+    STOPPED = 0
+    PAUSED = 1
+    OK = 2
+    ERROR = 3
+    DISABLED = 4
 
 
 class NoValue:

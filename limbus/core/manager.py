@@ -51,7 +51,7 @@ class Pipeline(nn.Module):
         """Set a hook to be executed before the pipeline execution.
 
         This callable must have a single parameter which is the state of the pipeline at the begining of the pipeline.
-        The only requirements is that it must be async.
+        Moreover it must be async.
 
         Prototype: async def hook_name(state: PipelineState).
         """
@@ -155,8 +155,8 @@ class Pipeline(nn.Module):
         traversed_out_params: Set[Param] = set()
 
         for component in self.nodes:
-            # look for the component that has no input pins (only components with connections will be aded)
-            if len(component.inputs) == 0 and len(component.outputs.get_params(True)):
+            # look for and add the components without input pins
+            if len(component.inputs) == 0:
                 self._seq.append(component)
                 self._traverse(component, traversed_out_params)
 
@@ -226,25 +226,25 @@ class Pipeline(nn.Module):
             # code to run before running the next iteration in the pipeline
             for obj in self._seq:
                 obj.finish_iter()
-            if self._after_iteration_hook is not None:
-                if state == ComponentState.STOPPED:
-                    await self._after_iteration_hook(PipelineState.ENDED)
-                elif state in [ComponentState.ERROR, ComponentState.NotImplemented]:
-                    await self._after_iteration_hook(PipelineState.ERROR)
-                else:
-                    await self._after_iteration_hook(PipelineState.RUNNING)
 
-            # determine if the pipeline execution has finished
-            if state in [ComponentState.STOPPED, ComponentState.ERROR, ComponentState.NotImplemented]:
-                if state == ComponentState.STOPPED:
-                    pipe_state = PipelineState.ENDED
-                    log.info("Pipeline finished.")
-                if state in [ComponentState.ERROR, ComponentState.NotImplemented]:
-                    log.info("Pipeline finished with an error.")
-                    pipe_state = PipelineState.ERROR
+            # set the pipeline state after the iteration
+            pipe_state = PipelineState.RUNNING
+            if state == ComponentState.STOPPED:
+                pipe_state = PipelineState.ENDED
+                log.info("Pipeline finished.")
+            elif state in [ComponentState.ERROR, ComponentState.NotImplemented]:
+                pipe_state = PipelineState.ERROR
+                log.info("Pipeline finished with an error.")
+
+            if self._after_iteration_hook is not None:
+                await self._after_iteration_hook(pipe_state)
+
+            # finish the pipeline
+            if pipe_state in [PipelineState.ENDED, PipelineState.ERROR]:
                 if self._after_pipeline_hook is not None:
                     await self._after_pipeline_hook(pipe_state)
                 break
+        # disable the pause if was paused
         self._pause = False
         return pipe_state
 
