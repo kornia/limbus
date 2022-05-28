@@ -74,8 +74,11 @@ class ImageReader(Component):
 
 class ImageShow(Component):
     """Component to show the input image."""
-    def __init__(self, name: str):
+    def __init__(self, name: str, window: str = ""):
         super().__init__(name)
+        self._window = window
+        if window == "":
+            self._window = self._name
         self._enabled = True
         try:
             self._visdom = visdom.Visdom(port=8087, raise_exceptions=True)
@@ -96,14 +99,14 @@ class ImageShow(Component):
         return inputs
 
     def forward(self) -> ComponentState:  # noqa: D102
-        opts = {'title': self.name}
+        opts = {'title': self._window}
         # TODO: for batches use `images`
         images = self._inputs.get_param("image")
         if self._enabled:
             if images.shape[0] == 1:
-                self._visdom.image(images[0], win=self.name, opts=opts)
+                self._visdom.image(images[0], win=self._window, opts=opts)
             else:
-                self._visdom.images(images, nrow=int(images.shape[0]), win=self.name, opts=opts)
+                self._visdom.images(images, nrow=int(images.shape[0]), win=self._window, opts=opts)
             return ComponentState.OK
         # TODO: find a way to notify when the component is DISABLED or retruns an ERROR
         return ComponentState.DISABLED
