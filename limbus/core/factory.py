@@ -7,6 +7,7 @@ from importlib.abc import Loader
 import logging
 import types
 from pathlib import Path
+import sys
 
 import yaml
 import typeguard
@@ -310,6 +311,7 @@ def component_factory(module: str, name: str, extra: ExtraParams) -> None:
     if inspect.isfunction(callable_to_wrap) or inspect.isbuiltin(callable_to_wrap):
         # 1. define the class template
         func = (f"class {str_name}(Component):\n"
+                f"    callable_object = callable_forward\n"
                 f"    def __init__(self, name: str) -> None:\n"
                 f"        super().__init__(name)\n"
                 f"        self._callable = callable_forward\n")
@@ -331,13 +333,16 @@ def component_factory(module: str, name: str, extra: ExtraParams) -> None:
         # 2. write the template for the component
         str_params_def = f"self, name: str, {str_params_def}"  # add the name parameter required by the component
         func = (f"class {str_name}(Component):\n"
+                f"    callable_object = {name}\n"
                 f"    def __init__({str_params_def}) -> None:\n"
                 f"        super().__init__(name)\n"
-                f"        self._real_obj = {name}({str_params})\n"
+                f"        self._real_obj =  {name}({str_params})\n"
                 f"        self._callable = self._real_obj.forward\n")
         # 3. compile the code and add the methods to the component class
         code = compile(func, f"dynamic module: {module}", "exec")
         eval(code, globals)
+    # set the documentation of the original class or function
+    globals[str_name].__doc__ = inspect.getdoc(callable_to_wrap)
     globals[str_name].forward = forward
     globals[str_name].register_inputs = register_inputs
     globals[str_name].register_outputs = register_outputs
