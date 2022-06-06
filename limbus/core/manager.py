@@ -206,7 +206,11 @@ class Pipeline(nn.Module):
                     await self._before_component_hook(obj)
 
                 # exec the component
-                state = obj()
+                try:
+                    state = obj()
+                except Exception as e:
+                    log.error(f"Error in component {obj.name}: {e}")
+                    state = ComponentState.ERROR
 
                 if self._after_component_hook is not None:
                     await self._after_component_hook(obj, state)
