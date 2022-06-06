@@ -51,7 +51,7 @@ class Pipeline(nn.Module):
         """Set a hook to be executed before the pipeline execution.
 
         This callable must have a single parameter which is the state of the pipeline at the begining of the pipeline.
-        Moreover it must be async.
+        The callable must be async.
 
         Prototype: async def hook_name(state: PipelineState).
         """
@@ -61,7 +61,7 @@ class Pipeline(nn.Module):
         """Set a hook to be executed after the pipeline execution.
 
         This callable must have a single parameter which is the state of the pipeline at the end of the pipeline.
-        Moreover it must be async.
+        The callable must be async.
 
         Prototype: async def hook_name(state: PipelineState).
         """
@@ -71,7 +71,7 @@ class Pipeline(nn.Module):
         """Set a hook to be executed before each iteration.
 
         This callable must have a single parameter which is an int denoting the iter being executed.
-        Moreover it must be async.
+        The callable must be async.
 
         Prototype: async def hook_name(counter: int).
         """
@@ -81,7 +81,7 @@ class Pipeline(nn.Module):
         """Set a hook to be executed after each iteration.
 
         This callable must have a single parameter which is the state of the pipeline at the end of the iteration.
-        Moreover it must be async.
+        The callable must be async.
 
         Prototype: async def hook_name(state: PipelineState).
         """
@@ -91,7 +91,7 @@ class Pipeline(nn.Module):
         """Set a hook to be executed before each component.
 
         This callable must have a single parameter which is the component being executed.
-        Moreover it must be async.
+        The callable must be async.
 
         Prototype: async def hook_name(obj: Componet).
         """
@@ -100,10 +100,11 @@ class Pipeline(nn.Module):
     def set_after_component_hook(self, hook: Optional[Callable]) -> None:
         """Set a hook to be executed after each component.
 
-        This callable must have 2 parameters which are the component being executed and its state
-        after the execution. Moreover it must be async.
+        This callable must have 3 parameters which are the component being executed, its state
+        after the execution and an optional param with an exception raised by the component.
+        The callable must be async.
 
-        Prototype: async def hook_name(obj: Componet, state: ComponentState).
+        Prototype: async def hook_name(obj: Componet, state: ComponentState, e: Optional[Exception] = None).
         """
         self._after_component_hook = hook
 
@@ -206,14 +207,16 @@ class Pipeline(nn.Module):
                     await self._before_component_hook(obj)
 
                 # exec the component
+                exception: Optional[Exception] = None
                 try:
                     state = obj()
                 except Exception as e:
+                    exception = e
                     log.error(f"Error in component {obj.name}: {e}")
                     state = ComponentState.ERROR
 
                 if self._after_component_hook is not None:
-                    await self._after_component_hook(obj, state)
+                    await self._after_component_hook(obj, state, exception)
 
                 if state == ComponentState.STOPPED:
                     log.info(f"Component {obj.name} stopped the pipeline.")
