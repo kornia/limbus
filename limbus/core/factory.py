@@ -237,8 +237,9 @@ def component_factory(module: str, name: str, extra: ExtraParams) -> None:
         # if the return_annotation is None, we need to convert it into its type (anyway this shouldn't happen)
         if return_annotation is None:
             return_annotation = NoneType
-        if (not typeguard.isclass(return_annotation) and return_annotation._name == "Tuple"
-                and len(return_annotation.__args__) > 1 and Ellipsis not in return_annotation.__args__):
+        if (not typeguard.isclass(return_annotation) and
+                return_annotation._name == "Tuple" and
+                len(return_annotation.__args__) > 1 and Ellipsis not in return_annotation.__args__):
             # variable number of outputs
             # NOTE: if there are several names, len(name) and the number of returns must coincide!!!
             for idx, arg in enumerate(return_annotation.__args__):
