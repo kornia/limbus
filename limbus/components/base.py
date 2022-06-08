@@ -29,9 +29,12 @@ class ImageReader(Component):
     """Component that read images.
 
     Args:
-        name: component name.
-        value: path to an image or image folder.
-        batch_size: number of images to read in a batch. Default: 1.
+        name (str): component name.
+        path (Path): path to an image or image folder.
+        batch_size (int): number of images to read in a batch. Default: 1.
+
+    Outpus:
+        image (torch.Tensor): a batch of images (NxCxHxW).
 
     """
     def __init__(self, name: str, path: Path, batch_size: int = 1):
@@ -76,9 +79,12 @@ class ImageShow(Component):
     """Component to show images.
 
     Args:
-        name: component name.
-        window: name of the window containing the image/s.
-                Default: None -> window name is the component id.
+        name ()trs: component name.
+        window (str): name of the window containing the image/s.
+                      Default: None -> window name is the component id.
+
+    Inputs:
+        image (torch.Tensor): a batch of images (NxCxHxW).
 
     """
     def __init__(self, name: str, window: str = ""):
@@ -126,8 +132,11 @@ class Constant(Component):
     """Component that holds a constant.
 
     Args:
-        name: component name.
-        value: constant value.
+        name (str): component name.
+        value (Any): constant value.
+
+    Outputs:
+        out (Any): constant value. Same value as the arg value.
 
     """
     def __init__(self, name: str, value: Any):
@@ -150,7 +159,10 @@ class Printer(Component):
     """Component to print the input in the console.
 
     Args:
-        name: component name.
+        name (str): component name.
+
+    Inputs:
+        inp (Any): input to print.
 
     """
     def __init__(self, name: str):
@@ -172,7 +184,14 @@ class Adder(Component):
     """Component to add two inputs and output the result.
 
     Args:
-        name: component name.
+        name (str): component name.
+
+    Inputs:
+        a (torch.Tensor): first input.
+        b (torch.Tensor): second input.
+
+    Outputs:
+        out (torch.Tensor): sum of the inputs.
 
     """
     def __init__(self, name: str):
@@ -203,11 +222,17 @@ class ImageStitcher(Component):
     """Component to stitch images together.
 
     Args:
-        name: component name.
-        estimator: method to compute homography, either "vanilla" or "ransac".
-            "ransac" is slower with a better accuracy.
-        blending_method: method to blend two images together.
-            Only "naive" is currently supported.
+        name (str): component name.
+        estimator (str): method to compute homography, either "vanilla" or "ransac".
+            Default: "ransac".
+        blending_method (str): method to blend two images together.
+            Only "naive" is currently supported. Default: "naive".
+
+    Inputs:
+        imgs (torch.Tensor): images to be stitched.
+
+    Outputs:
+        out (torch.Tensor): stitched image.
 
     """
     def __init__(self, name: str, estimator: str = 'ransac', blending_method: str = 'naive'):
@@ -237,7 +262,14 @@ class ImageRegistrator(Component):
     """Component to register images.
 
     Args:
-        name: component name.
+        name (str): component name.
+
+    Inputs:
+        img_src (torch.Tensor): source image.
+        img_dst (torch.Tensor): destination image.
+
+    Outputs:
+        homo (torch.Tensor): homography.
 
     """
     def __init__(self, name: str):
