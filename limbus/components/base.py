@@ -3,12 +3,11 @@
 All the components are "saved" as classes in limbus.components, being the original module name used
 to create a clear name for the component.
 E.g.:
-limbus.components.base.ImageReader -> limbus.components.limbus___ImageReader
-torch.unbind                       -> limbus.components.torch___unbind
-kornia.color.rgb_to_hls            -> limbus.components.kornia___color___rgb_to_hls
+limbus.components.base.ImageReader -> limbus.components.limbus.base.ImageReader
+torch.unbind                       -> limbus.components.torch.unbind
+kornia.color.rgb_to_hls            -> limbus.components.kornia.color.rgb_to_hls
 
-The components automatically created are always saved in the limbus.components module using ___ to
-denote the original module.
+The components automatically created are always saved in the limbus.components module.
 """
 from typing import Any, List
 from pathlib import Path
@@ -27,11 +26,15 @@ log = logging.getLogger(__name__)
 
 
 class ImageReader(Component):
-    """Component that holds a constant.
+    """Component that read images.
 
     Args:
-        name: component name.
-        value: path to an image or image folder.
+        name (str): component name.
+        path (Path): path to an image or image folder.
+        batch_size (int): number of images to read in a batch. Default: 1.
+
+    Outpus:
+        image (torch.Tensor): a batch of images (NxCxHxW).
 
     """
     def __init__(self, name: str, path: Path, batch_size: int = 1):
@@ -73,7 +76,17 @@ class ImageReader(Component):
 
 
 class ImageShow(Component):
-    """Component to show the input image."""
+    """Component to show images.
+
+    Args:
+        name ()trs: component name.
+        window (str): name of the window containing the image/s.
+                      Default: None -> window name is the component id.
+
+    Inputs:
+        image (torch.Tensor): a batch of images (NxCxHxW).
+
+    """
     def __init__(self, name: str, window: str = ""):
         super().__init__(name)
         self._window = window
@@ -116,7 +129,16 @@ class ImageShow(Component):
 
 
 class Constant(Component):
-    """Component that holds a constant."""
+    """Component that holds a constant.
+
+    Args:
+        name (str): component name.
+        value (Any): constant value.
+
+    Outputs:
+        out (Any): constant value. Same value as the arg value.
+
+    """
     def __init__(self, name: str, value: Any):
         super().__init__(name)
         self._value = value
@@ -134,7 +156,15 @@ class Constant(Component):
 
 
 class Printer(Component):
-    """Component to print the input in the console."""
+    """Component to print the input in the console.
+
+    Args:
+        name (str): component name.
+
+    Inputs:
+        inp (Any): input to print.
+
+    """
     def __init__(self, name: str):
         super().__init__(name)
 
@@ -151,7 +181,19 @@ class Printer(Component):
 
 # Example of a simple component created from the API
 class Adder(Component):
-    """Component to add two inputs and output the result."""
+    """Component to add two inputs and output the result.
+
+    Args:
+        name (str): component name.
+
+    Inputs:
+        a (torch.Tensor): first input.
+        b (torch.Tensor): second input.
+
+    Outputs:
+        out (torch.Tensor): sum of the inputs.
+
+    """
     def __init__(self, name: str):
         super().__init__(name)
 
@@ -177,7 +219,22 @@ class Adder(Component):
 
 # temporal classes while we solve pending issues. TODO: allow components as parameters
 class ImageStitcher(Component):
-    """Component to stitch images together."""
+    """Component to stitch images together.
+
+    Args:
+        name (str): component name.
+        estimator (str): method to compute homography, either "vanilla" or "ransac".
+            Default: "ransac".
+        blending_method (str): method to blend two images together.
+            Only "naive" is currently supported. Default: "naive".
+
+    Inputs:
+        imgs (torch.Tensor): images to be stitched.
+
+    Outputs:
+        out (torch.Tensor): stitched image.
+
+    """
     def __init__(self, name: str, estimator: str = 'ransac', blending_method: str = 'naive'):
         super().__init__(name)
         gftt_hardnet_matcher = kornia.feature.LocalFeatureMatcher(kornia.feature.GFTTAffNetHardNet(500),
@@ -202,7 +259,19 @@ class ImageStitcher(Component):
 
 
 class ImageRegistrator(Component):
-    """Component to register images."""
+    """Component to register images.
+
+    Args:
+        name (str): component name.
+
+    Inputs:
+        img_src (torch.Tensor): source image.
+        img_dst (torch.Tensor): destination image.
+
+    Outputs:
+        homo (torch.Tensor): homography.
+
+    """
     def __init__(self, name: str):
         super().__init__(name)
         self._ir = kornia.geometry.ImageRegistrator()
