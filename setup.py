@@ -8,8 +8,6 @@ setup(name='limbus',
       install_requires=[
           'torch',
           'numpy',
-          'matplotlib',
-          'tensorboard',
           'visdom',
           'typeguard',
           'kornia',

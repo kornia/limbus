@@ -9,8 +9,6 @@ dependencies:
   - python
   - pytorch
   - numpy
-  - matplotlib
-  - tensorboard
   - visdom
   - typeguard
   - pyyaml
