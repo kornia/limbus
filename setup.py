@@ -27,5 +27,8 @@ setup(name='limbus',
               'types-PyYAML'
           ]
       },
-      packages=find_packages(),
+      packages=find_packages(where='.'),
+      package_dir={'': '.'},
+      package_data={'': ['*.yml']},
+      include_package_data=True
       )
