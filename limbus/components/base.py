@@ -94,7 +94,7 @@ class ImageShow(Component):
             self._window = self._name
         self._enabled = True
         try:
-            self._visdom = visdom.Visdom(port=8087, raise_exceptions=True)
+            self._visdom = visdom.Visdom(port=8097, raise_exceptions=True)
         except:
             self._enabled = False
 
