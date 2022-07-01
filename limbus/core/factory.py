@@ -1,6 +1,11 @@
 """Module containing the basic functions to create components automatically."""
 import inspect
-from typing import Callable, Union, Dict, Any, cast, List, TypedDict, Optional, NamedTuple, Tuple
+from typing import Callable, Union, Dict, Any, cast, List, Optional, NamedTuple, Tuple
+try:
+    # TypedDict is supported by python >3.8
+    from typing import TypedDict
+except:
+    from mypy_extensions import TypedDict
 import importlib
 from importlib.machinery import ModuleSpec
 from importlib.abc import Loader

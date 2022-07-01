@@ -11,7 +11,8 @@ setup(name='limbus',
           'visdom',
           'typeguard',
           'kornia',
-          'pyyaml'
+          'pyyaml',
+          'mypy_extensions'  # only required for some python versions (<3.8)because TypedDict is not supported
       ],
       extras_require={
           'dev': [
