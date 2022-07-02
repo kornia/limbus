@@ -476,6 +476,8 @@ def register_components_from_module(file_name: str) -> None:
     module = importlib.util.module_from_spec(spec)
     assert isinstance(spec.loader, Loader)
     spec.loader.exec_module(module)
+    # ensure the module can be imported
+    sys.modules[module.__name__] = module
     # get access to all the components in the module
     globals = COMP_GLOBALS
     if module not in globals:
