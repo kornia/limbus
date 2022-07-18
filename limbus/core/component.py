@@ -9,6 +9,7 @@ import inspect
 import collections
 
 import typeguard
+import torch
 import torch.nn as nn
 import numpy as np
 
@@ -101,24 +102,32 @@ class IterableInputContainers:
 
 
 def _check_subscriptable(datatype: type) -> bool:
-    """Checf if datatype is subscriptable.
+    """Checf if datatype is subscriptable with tensors inside.
 
     Args:
         datatype (type): type to be analised.
 
     Returns:
-        bool: True if datatype is subscriptable, False otherwise.
+        bool: True if datatype is a subscriptable with tensors, False otherwise.
 
     """
     if inspect.isclass(datatype):
         return False
 
+    # in this case is a typing expresion
+    # we need to know if it is a variable size datatype, we assume that all the sequences are variable size
+    # if they contain tensors. E.g. List[Tensor], Tuple[Tensor], Sequence[Tensor].
+    # Note that e.g. for the case Tuple[Tensor, Tensor] we don't assume it is variable since the size is known.
     origin = typing.get_origin(datatype)
-    if inspect.isabstract(origin) and (collections.abc.Sequence or collections.abc.Iterable):
-        return True
-    # mypy complaints in the case origin is NoneType
-    if (inspect.isclass(origin) and isinstance(origin(), typing.Iterable)):  # type: ignore
-        return True
+    datatype_args: Tuple = typing.get_args(datatype)
+    if inspect.isclass(origin):
+        is_abstract: bool = inspect.isabstract(origin)
+        is_abstract_seq: bool = origin is collections.abc.Sequence or origin is collections.abc.Iterable
+        # mypy complaints in the case origin is NoneType
+        if is_abstract_seq or (not is_abstract and isinstance(origin(), typing.Iterable)):  # type: ignore
+            if (len(datatype_args) == 1 or (len(datatype_args) == 2 and Ellipsis in datatype_args)):
+                if datatype_args[0] is torch.Tensor:
+                    return True
     return False
 
 
@@ -198,6 +207,7 @@ class Param:
         self._arg: Optional[str] = arg
         self._refs: Dict[Any, Set[Tuple["Param", Optional[int]]]] = defaultdict(set)
         self._value: Union[Container, IterableContainer, IterableInputContainers] = Container(value)
+        # only sequences with tensors inside are subscriptable
         self._is_subscriptable = _check_subscriptable(tp)
 
     @property
@@ -252,7 +262,8 @@ class Param:
         if not isinstance(self._value, Container):
             raise TypeError(f"Param '{self.name}' cannot be assigned.")
         if isinstance(value, (Container, IterableContainer, Set)):
-            raise TypeError(f"The type of the value to be assigned to param '{self.name}' cannot have a Value type.")
+            raise TypeError(
+                f"The type of the value to be assigned to param '{self.name}' cannot have a 'value' attribute.")
         typeguard.check_type(self._name, value, self._type)
         self._value.value = value
 
@@ -289,18 +300,26 @@ class Param:
 
         """
         if not self._is_subscriptable:
-            raise ValueError(f"The param '{self.name}' is not a subscriptable.")
+            raise ValueError(f"The param '{self.name}' is not subscriptable (it must be a sequence of tensors).")
         # NOTE: we cannot check if the index is valid because it is not known at this point the len of the sequence
         # create a new param with the selected slice inside the param
         return IterableParam(self, index)
 
     def _connect(self, ori: Union["Param", IterableParam], dst: Union["Param", IterableParam]) -> None:
         """Connect this parameter (output) with the dst (input) parameter."""
-        if self._is_subscriptable and isinstance(ori, Param):
-            raise ValueError(f"The param '{self.name}' must be connected using indexes.")
+        if isinstance(ori, Param) and ori._is_subscriptable:
+            raise ValueError(f"The param '{ori.name}' must be connected using indexes.")
 
         if isinstance(dst, Param) and dst._is_subscriptable:
             raise ValueError(f"The param '{dst.name}' must be connected using indexes.")
+
+        # NOTE that there are not type validation, we will trust in the user to connect params.
+        # We only check when there is an explicit value in the ori param.
+        if isinstance(ori, Param) and not isinstance(ori.value, NoValue):
+            if isinstance(dst, Param):
+                typeguard.check_type(self._name, ori.value, dst.type)
+            else:
+                typeguard.check_type(self._name, ori.value, typing.get_args(dst.param.type)[0])
 
         # TODO: check that dst param is an input param
         # TODO: check type compatibility
@@ -333,7 +352,7 @@ class Param:
             dst.iter_container.container = ori.iter_container
 
         # if dest is an IterableParam means that several ori params can be connected to different dest indexes
-        # so they should be saved as a set of params
+        # so they are stored as a list of params
         if isinstance(dst, IterableParam):
             assert isinstance(dst.iter_container, IterableContainer)
             if isinstance(dst.param.container, IterableInputContainers):
