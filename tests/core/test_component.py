@@ -115,6 +115,10 @@ class TestParam:
         p = Param("a", tp=int, value=1)
         assert p.value == 1
 
+    def test_init_with_invalid_value_raise_error(self):
+        with pytest.raises(TypeError):
+            Param("a", tp=int, value=1.)
+
     def test_init_with_arg(self):
         p = Param("a", arg="arg0")
         assert p.arg == "arg0"
@@ -127,20 +131,22 @@ class TestParam:
             p.value = "a"
 
     def test_get_iterable_value(self):
-        iter_container = IterableContainer(Container([1, 2]), 0)
+        # only torch.Tensor can be iterable at this moment
+        iter_container = IterableContainer(Container([torch.tensor(1), torch.tensor(2)]), 0)
         p = Param("a", value=iter_container)
         assert isinstance(p.container, Container)
         assert p.container.value is iter_container
-        assert p.value == 1
+        assert p.value == torch.tensor(1)
 
     def test_get_iterable_input_value(self):
-        p = Param("a", tp=typing.List[int])
-        p.container = IterableInputContainers(IterableContainer(Container(1), 1))
-        p.container.add(IterableContainer(Container(2), 0))
-        assert p.value == [2, 1]
+        # only torch.Tensor can be iterable at this moment
+        p = Param("a", tp=typing.List[torch.Tensor])
+        p.container = IterableInputContainers(IterableContainer(Container(torch.tensor(1)), 1))
+        p.container.add(IterableContainer(Container(torch.tensor(2)), 0))
+        assert p.value == [torch.tensor(2), torch.tensor(1)]
 
     def test_select(self):
-        p = Param("a", typing.List[int], value=[1, 2])
+        p = Param("a", typing.List[torch.Tensor], value=[torch.tensor(1), torch.tensor(1)])
         assert p._is_subscriptable
         iter_param = p.select(0)
         assert isinstance(iter_param, IterableParam)
@@ -149,7 +155,7 @@ class TestParam:
         assert iter_param.iter_container.value == 1
 
     def test_connect_iterparam_param_no_select_raise_error(self):
-        p0 = Param("a", typing.List[int])
+        p0 = Param("a", typing.List[torch.Tensor])
         p1 = Param("b")
         with pytest.raises(ValueError):
             # mandatory connect with an index
@@ -157,12 +163,24 @@ class TestParam:
         p0.select(0).connect(p1)
 
     def test_connect_param_iterparam_no_select_raise_error(self):
-        p0 = Param("a", tp=typing.List[int])
-        p1 = Param("b", value=2)
+        p0 = Param("a", tp=typing.List[torch.Tensor])
+        p1 = Param("b", value=torch.Tensor(2))
         with pytest.raises(ValueError):
             # mandatory connect with an index
             p1.connect(p0)
         p1.connect(p0.select(0))
+
+    def test_connect_param_iterparam_no_valid_type_raise_error(self):
+        p0 = Param("a", tp=typing.List[torch.Tensor])
+        p1 = Param("b", value=2)
+        with pytest.raises(TypeError):
+            p1.connect(p0.select(0))
+
+    def test_connect_param_param_no_valid_type_raise_error(self):
+        p0 = Param("a", tp=int)
+        p1 = Param("b", value=2.)
+        with pytest.raises(TypeError):
+            p1.connect(p0)
 
     def test_connect_param_param(self):
         p0 = Param("a", value=1)
@@ -188,18 +206,18 @@ class TestParam:
         assert list(p1._refs[None]) == []
 
     def test_connect_disconnect_iterparam_param(self):
-        p0 = Param("a", tp=typing.List[int], value=[1, 2])
+        p0 = Param("a", tp=typing.List[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
         p1 = Param("b")
         p0.select(1).connect(p1)
         assert isinstance(p1.container, Container)
-        assert p1.value == 2
+        assert p1.value == torch.tensor(2)
         assert list(p0._refs.keys()) == [1]
         assert list(p0._refs[1]) == [(p1, None)]
         assert list(p1._refs.keys()) == [None]
         assert list(p1._refs[None]) == [(p0, 1)]
 
     def test_disconnect_iterparam_param(self):
-        p0 = Param("a", tp=typing.List[int], value=[1, 2])
+        p0 = Param("a", tp=typing.List[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
         p1 = Param("b")
         p0.select(1).connect(p1)
         p0.select(1).disconnect(p1)
@@ -211,13 +229,13 @@ class TestParam:
         assert list(p1._refs[None]) == []
 
     def test_connect_param_iterparam(self):
-        p0 = Param("a", tp=typing.List[int])
-        p1 = Param("b", value=1)
-        p2 = Param("c", value=2)
+        p0 = Param("a", tp=typing.List[torch.Tensor])
+        p1 = Param("b", value=torch.tensor(1))
+        p2 = Param("c", value=torch.tensor(2))
         p1.connect(p0.select(1))
         p2.connect(p0.select(0))
         assert isinstance(p0.container, IterableInputContainers)
-        assert p0.value == [2, 1]
+        assert p0.value == [torch.tensor(2), torch.tensor(1)]
         assert sorted(list(p0._refs.keys())) == sorted([0, 1])
         assert list(p0._refs[0]) == [(p2, None)]
         assert list(p0._refs[1]) == [(p1, None)]
@@ -227,9 +245,9 @@ class TestParam:
         assert list(p2._refs[None]) == [(p0, 0)]
 
     def test_disconnect_param_iterparam(self):
-        p0 = Param("a", tp=typing.List[int])
-        p1 = Param("b", value=1)
-        p2 = Param("c", value=2)
+        p0 = Param("a", tp=typing.List[torch.Tensor])
+        p1 = Param("b", value=torch.tensor(1))
+        p2 = Param("c", value=torch.tensor(2))
         p1.connect(p0.select(1))
         p2.connect(p0.select(0))
         p1.disconnect(p0.select(1))
@@ -245,12 +263,12 @@ class TestParam:
         assert list(p2._refs[None]) == []
 
     def test_connect_iterparam_iterparam(self):
-        p0 = Param("a", tp=typing.List[int], value=[1, 2])
-        p1 = Param("b", tp=typing.List[int])
+        p0 = Param("a", tp=typing.List[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
+        p1 = Param("b", tp=typing.List[torch.Tensor])
         p0.select(0).connect(p1.select(1))
         p0.select(1).connect(p1.select(0))
         assert isinstance(p1.container, IterableInputContainers)
-        assert p1.value == [2, 1]
+        assert p1.value == [torch.tensor(2), torch.tensor(1)]
         assert sorted(list(p0._refs.keys())) == sorted([0, 1])
         assert list(p0._refs[0]) == [(p1, 1)]
         assert list(p0._refs[1]) == [(p1, 0)]
@@ -259,8 +277,8 @@ class TestParam:
         assert list(p1._refs[1]) == [(p0, 0)]
 
     def test_disconnect_iterparam_iterparam(self):
-        p0 = Param("a", tp=typing.List[int], value=[1, 2])
-        p1 = Param("b", tp=typing.List[int])
+        p0 = Param("a", tp=typing.List[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
+        p1 = Param("b", tp=typing.List[torch.Tensor])
         p0.select(0).connect(p1.select(1))
         p0.select(1).connect(p1.select(0))
         p0.select(0).disconnect(p1.select(1))
@@ -298,7 +316,7 @@ class TestParam:
         assert p2.ref_counter(None) == 1
 
     def test_ref_counter_iterable(self):
-        p0 = Param("a", typing.List[int], value=[1, 2])
+        p0 = Param("a", typing.List[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
         p1 = Param("b")
         p2 = Param("c")
         p0.select(0).connect(p1)
@@ -376,10 +394,16 @@ class TestComponent:
 
 
 def test_check_subscriptable():
-    assert limbus.core.component._check_subscriptable(typing.Sequence[int])
-    assert limbus.core.component._check_subscriptable(typing.Iterable[int])
-    assert limbus.core.component._check_subscriptable(typing.List[int])
-    assert limbus.core.component._check_subscriptable(typing.Tuple[int])
+    # only torch.Tensor is subscriptable
+    assert not limbus.core.component._check_subscriptable(typing.Sequence[int])
+    assert not limbus.core.component._check_subscriptable(typing.Iterable[int])
+    assert not limbus.core.component._check_subscriptable(typing.List[int])
+    assert not limbus.core.component._check_subscriptable(typing.Tuple[int])
+    assert limbus.core.component._check_subscriptable(typing.Sequence[torch.Tensor])
+    assert limbus.core.component._check_subscriptable(typing.Iterable[torch.Tensor])
+    assert limbus.core.component._check_subscriptable(typing.List[torch.Tensor])
+    assert limbus.core.component._check_subscriptable(typing.Tuple[torch.Tensor])
+    assert not limbus.core.component._check_subscriptable(typing.Tuple[torch.Tensor, torch.Tensor])
     assert not limbus.core.component._check_subscriptable(int)
     assert not limbus.core.component._check_subscriptable(torch.Tensor)
     assert not limbus.core.component._check_subscriptable(str)
