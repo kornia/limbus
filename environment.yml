@@ -1,0 +1,5 @@
+name: limbus
+
+dependencies:
+  - pip
+  - python<3.10
