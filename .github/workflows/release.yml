@@ -1,0 +1,29 @@
+name: PyPI Release
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  pypi:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - uses: actions/setup-python@v2
+    - name: Install dependencies
+      run: python3 -m pip install --upgrade setuptools wheel
+    - name: Compile project
+      run: python3 -m pip install -e .
+    - name: Build distribution package
+      run: python3 setup.py sdist bdist_wheel
+    - name: Publish package to 📦 Test PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.PYPI_TEST_PASSWORD_LIMBUS }}
+        repository_url: https://test.pypi.org/legacy/
+    - name: Publish distribution 📦 to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_PASSWORD_LIMBUS }}
