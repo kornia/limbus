@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='limbus',
-      version='0.1.0',
+      version='0.1.0.dev',
       description='High level interface to create Pytorch Graphs.',
       author='Kornia.org',
       url='https://github.com/kornia/limbus',
