@@ -54,7 +54,7 @@ jobs:
       #  run: python -m flake8
 
       - name: Build the code and Install dependencies
-        run: pip install -e .[dev]
+        run: pip install -e .[dev,components]
 
       - name: Run tests
         run: python -m pytest -v

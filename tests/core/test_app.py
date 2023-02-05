@@ -1,7 +1,7 @@
 import pytest
 
 from limbus.core import App
-from components import Constant, Printer
+from limbus_components.base import Constant, Printer
 
 
 @pytest.mark.usefixtures("event_loop_instance")
