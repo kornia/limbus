@@ -88,13 +88,29 @@ MyApp().run(1)
 
 ## Installation
 
+from PyPI:
+```bash
+pip install limbus  # limbus alone
+# or
+pip install limbus[components]  # limbus + some predefined components
+```
+
+from the repository:
+
+```bash
+pip install limbus@git+https://git@github.com/kornia/limbus.git  # limbus alone
+# or
+pip install limbus[components]@git+https://git@github.com/kornia/limbus.git  # limbus + some predefined components
+```
+
+For development purposes, you can install the environment with the following commands:
 ```bash
 git clone https://github.com/kornia/limbus
 cd limbus
 source path.bash.inc
 ```
 
-In order to regenerate the environment:
+In order to regenerate the development environment:
 ```bash
 cd limbus
 rm -rf .dev_env
