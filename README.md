@@ -88,22 +88,33 @@ MyApp().run(1)
 
 ## Installation
 
-from PyPI:
+### from PyPI:
 ```bash
 pip install limbus  # limbus alone
-# or
+```
+
+optionally some predefined components can be installed.
+
+In the near future with PyPI (not yet available)
+```bash
 pip install limbus[components]  # limbus + some predefined components
 ```
 
-from the repository:
+currently they can be installed from the repository:
+```bash
+pip install limbus-components@git+https://git@github.com/kornia/limbus-components.git
+```
+
+### from the repository:
 
 ```bash
 pip install limbus@git+https://git@github.com/kornia/limbus.git  # limbus alone
-# or
-pip install limbus[components]@git+https://git@github.com/kornia/limbus.git  # limbus + some predefined components
+pip install limbus-components@git+https://git@github.com/kornia/limbus-components.git  # some predefined components (optional)
 ```
 
-For development purposes, you can install the environment with the following commands:
+### for development
+
+you can install the environment with the following commands:
 ```bash
 git clone https://github.com/kornia/limbus
 cd limbus
@@ -114,6 +125,7 @@ In order to regenerate the development environment:
 ```bash
 cd limbus
 rm -rf .dev_env
+source path.bash.inc
 ```
 
 ## Testing

@@ -11,8 +11,8 @@ import limbus.widgets
 try:
     import limbus_components as components
 except ImportError:
-    raise ImportError("limbus-components is required to run this script. Reinstall limbus with: "
-                      "'pip install limbus[components]' or install the package with: "
+    raise ImportError("limbus-components is required to run this script."
+                      "Install the package with: "
                       "'pip install limbus-components@git+https://git@github.com/kornia/limbus-components.git'")
 
 # Init the widgets backend
