@@ -3,6 +3,8 @@ from setuptools import setup, find_packages
 setup(name='limbus',
       version='0.1.0.dev',
       description='High level interface to create Pytorch Graphs.',
+      long_description=open('README.md').read(),
+      long_description_content_type='text/markdown',
       author='Luis Ferraz',
       url='https://github.com/kornia/limbus',
       install_requires=[
