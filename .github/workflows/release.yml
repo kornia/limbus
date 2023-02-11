@@ -20,6 +20,7 @@ jobs:
     - name: Publish package to 📦 Test PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
+        user: __token__
         password: ${{ secrets.PYPI_TEST_PASSWORD_LIMBUS }}
         repository_url: https://test.pypi.org/legacy/
     - name: Publish distribution 📦 to PyPI
