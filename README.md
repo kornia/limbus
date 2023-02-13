@@ -91,25 +91,16 @@ MyApp().run(1)
 ### from PyPI:
 ```bash
 pip install limbus  # limbus alone
-```
-
-optionally some predefined components can be installed.
-
-In the near future with PyPI (not yet available)
-```bash
+# or
 pip install limbus[components]  # limbus + some predefined components
-```
-
-currently they can be installed from the repository:
-```bash
-pip install limbus-components@git+https://git@github.com/kornia/limbus-components.git
 ```
 
 ### from the repository:
 
 ```bash
 pip install limbus@git+https://git@github.com/kornia/limbus.git  # limbus alone
-pip install limbus-components@git+https://git@github.com/kornia/limbus-components.git  # some predefined components (optional)
+# or
+pip install limbus[components]@git+https://git@github.com/kornia/limbus.git  # limbus + some predefined components
 ```
 
 ### for development
