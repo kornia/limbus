@@ -5,9 +5,15 @@ from typing import Optional, Union, List, Callable, Set, Tuple, Dict, Any
 import logging
 import functools
 
-import cv2
+try:
+    # NOTE: we import the cv2 & visdom modules here to avoid having it as a dependency
+    # for the whole project.
+    import cv2
+    import visdom
+except ImportError:
+    pass
+
 import torch
-import visdom
 import kornia
 import numpy as np
 
@@ -163,6 +169,11 @@ class Visdom(Viz):
 
     def __init__(self) -> None:
         super().__init__()
+        try:
+            import visdom
+        except:
+            raise ImportError("To use Visdom as backend install the widgets extras: "
+                              "pip install limbus[widgets]")
         self._vis: Optional[visdom.Visdom] = None
         self._try_init()
 
@@ -304,6 +315,14 @@ class Console(Viz):
 
 class OpenCV(Console):
     """Console visualization backend + openCV for images."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        try:
+            import cv2
+        except:
+            raise ImportError("To use OpenCV as backend install the widgets extras: "
+                              "pip install limbus[widgets]")
 
     @is_enabled
     @set_title

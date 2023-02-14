@@ -43,5 +43,5 @@ $conda_bin env create
 source $conda_bin_dir/activate $dev_env_dir/envs/limbus
 
 # install dev requirements
-pip install -e .[dev,components]
+pip install -e .[dev,components,widgets]
 # note that limbus-components is not installed in editable mode

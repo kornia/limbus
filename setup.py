@@ -10,10 +10,8 @@ setup(name='limbus',
       install_requires=[
           'torch',
           'numpy',
-          'visdom',
           'typeguard',
           'kornia',
-          'opencv-python'
       ],
       extras_require={
           'dev': [
@@ -30,7 +28,11 @@ setup(name='limbus',
           ],
           'components': [
               'limbus-components'
-          ]
+          ],
+          'widgets': [
+              'visdom',
+              'opencv-python',
+            ]
       },
       packages=find_packages(where='.'),
       package_dir={'': '.'},
