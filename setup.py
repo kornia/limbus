@@ -32,7 +32,7 @@ setup(name='limbus',
           'widgets': [
               'visdom',
               'opencv-python',
-            ]
+          ]
       },
       packages=find_packages(where='.'),
       package_dir={'': '.'},
