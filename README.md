@@ -95,6 +95,11 @@ pip install limbus  # limbus alone
 pip install limbus[components]  # limbus + some predefined components
 ```
 
+Note that to use widgets you need to install their dependencies:
+```bash
+pip install limbus[widgets]
+```
+
 ### from the repository:
 
 ```bash
