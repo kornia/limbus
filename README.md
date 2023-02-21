@@ -1,8 +1,7 @@
 # Limbus: Computer Vision pipelining for PyTorch
 
-## (🚨 Warning: Unstable Prototype 🚨)
-
 [![CI](https://github.com/kornia/limbus/actions/workflows/ci.yml/badge.svg)](https://github.com/kornia/limbus/actions/workflows/ci.yml)
+[![PyPI version](https://badge.fury.io/py/limbus.svg)](https://pypi.org/project/limbus)
 
 Similar to the eye [*corneal limbus*](https://en.wikipedia.org/wiki/Corneal_limbus) - **Limbus** is a framework to create Computer Vision pipelines within the context of Deep Learning and writen in terms of differentiable tensors message passing on top of Kornia and PyTorch.
 
@@ -85,6 +84,19 @@ class MyApp(App):
 
 MyApp().run(1)
 ```
+
+## Ecosystem
+
+Limbus is a core technology to easily build different components and create generic pipelines. In the following list, you can find different examples 
+about how to use Limbus with some first/third party projects containing components:
+
+- Official examples:
+  - Basic pipeline generation: https://github.com/kornia/limbus/blob/main/examples/default_cmps.py
+  - Define custom components: https://github.com/kornia/limbus/blob/main/examples/defining_cmps.py
+  - Create a web camera application: https://github.com/kornia/limbus/blob/main/examples/defining_cmps.py
+- Official repository with a set of basic components: https://github.com/kornia/limbus-components
+- Example combining limbus and the farm-ng Amiga: https://github.com/edgarriba/amiga-limbus-examples
+- Example implementing a Kornia face detection pipeline: https://github.com/edgarriba/limbus-face-detector
 
 ## Installation
 
