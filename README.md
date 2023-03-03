@@ -86,6 +86,57 @@ class MyApp(App):
 MyApp().run(1)
 ```
 
+## Component definition
+
+Creating your own components is pretty easy, you just need to inherit from `limbus.Component` and implement some methods (see some examples in `examples/defining_cmps.py`).
+
+The `Component` class has the next main methods:
+- `__init__`: where you can add class parameters to your component.
+- `register_inputs`: where you need to declare the input pins of your component.
+- `register_outputs`: where you need to declare the output pins of your component.
+- `register_properties`: where you can declare properties that can be changed during the execution.
+- `forward`: where you must to define the logic of your component (mandatory).
+
+For a detailed list of `Component` methods and attributes, please check `limbus/core/component.py`.
+
+**Note** that if you want intellisense (at least in `VSCode` you will need to define the `input` and `output` types).
+
+Let's see a very simple example that sumns 2 integers:
+
+```python
+class Add(Component):
+    """Add two numbers."""
+    # NOTE: type definition is optional, but it helps with the intellisense. ;)
+    class InputsTyping(OutputParams):
+        a: InputParam
+        b: InputParam
+
+    class OutputsTyping(OutputParams):
+        out: OutputParam
+
+    inputs: InputsTyping
+    outputs: OutputsTyping
+
+    @staticmethod
+    def register_inputs(inputs: InputParams) -> None:
+        # Here you need to declare the input parameters and their default values (if they have).
+        inputs.declare("a", int)
+        inputs.declare("b", int)
+
+    @staticmethod
+    def register_outputs(outputs: OutputParams) -> None:
+        # Here you need to declare the output parameters.
+        outputs.declare("out", int)
+
+    async def forward(self) -> ComponentState:
+        # Here you must to define the logic of your component.
+        a, b = await asyncio.gather(
+            self.inputs.a.receive(),
+            self.inputs.b.receive()
+        )
+        await self.outputs.out.send(a + b)
+        return ComponentState.OK
+```
 ## Installation
 
 ### from PyPI:
