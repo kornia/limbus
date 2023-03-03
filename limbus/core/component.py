@@ -1,13 +1,17 @@
 """Component definition."""
 from __future__ import annotations
 from abc import abstractmethod
-from typing import List, Optional, TYPE_CHECKING, Callable
+from typing import List, Optional, TYPE_CHECKING, Callable, Type
 import logging
 import asyncio
 import traceback
 import functools
 
-import torch.nn as nn
+try:
+    import torch.nn as nn
+    base_cls: Type = nn.Module
+except ImportError:
+    base_cls = object
 
 from limbus.core.params import Params, InputParams, OutputParams
 from limbus.core.states import ComponentState, ComponentStoppedError
@@ -15,8 +19,10 @@ from limbus.core.states import ComponentState, ComponentStoppedError
 if TYPE_CHECKING:
     from limbus.core.pipeline import Pipeline
 
-
 log = logging.getLogger(__name__)
+
+class Module(base_cls):  # noqa: D101
+    pass
 
 
 # this is a decorator that will determine how many iterations must be run
@@ -86,7 +92,7 @@ class _ComponentState():
         self._verbose = value
 
 
-class Component(nn.Module):
+class Component(Module):
     """Base class to define a Limbus Component.
 
     Args:

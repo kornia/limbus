@@ -10,7 +10,21 @@ import asyncio
 import contextlib
 
 import typeguard
-import torch
+
+SUBSCRIPTABLE_TYPES: List[type] = []
+try:
+    import torch
+    SUBSCRIPTABLE_TYPES.append(torch.Tensor)
+except ImportError:
+    pass
+
+try:
+    import numpy as np
+    SUBSCRIPTABLE_TYPES.append(np.ndarray)
+except ImportError:
+    pass
+
+
 
 # Note that Component class cannot be imported to avoid circular dependencies.
 if TYPE_CHECKING:
@@ -120,7 +134,7 @@ def _check_subscriptable(datatype: type) -> bool:
         # mypy complaints in the case origin is NoneType
         if is_abstract_seq or (not is_abstract and isinstance(origin(), typing.Iterable)):  # type: ignore
             if (len(datatype_args) == 1 or (len(datatype_args) == 2 and Ellipsis in datatype_args)):
-                if datatype_args[0] is torch.Tensor:
+                if datatype_args[0] in SUBSCRIPTABLE_TYPES:
                     return True
     return False
 

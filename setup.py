@@ -8,10 +8,7 @@ setup(name='limbus',
       author='Luis Ferraz',
       url='https://github.com/kornia/limbus',
       install_requires=[
-          'torch',
-          'numpy',
           'typeguard',
-          'kornia',
       ],
       extras_require={
           'dev': [
@@ -30,6 +27,9 @@ setup(name='limbus',
               'limbus-components'
           ],
           'widgets': [
+              'kornia',
+              'torch',
+              'numpy',
               'visdom',
               'opencv-python',
           ]
