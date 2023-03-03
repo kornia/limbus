@@ -100,7 +100,7 @@ For a detailed list of `Component` methods and attributes, please check `limbus/
 
 **Note** that if you want intellisense (at least in `VSCode` you will need to define the `input` and `output` types).
 
-Let's see a very simple example that sumns 2 integers:
+Let's see a very simple example that sums 2 integers:
 
 ```python
 class Add(Component):
