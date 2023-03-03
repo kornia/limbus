@@ -6,16 +6,17 @@ import logging
 import functools
 
 try:
-    # NOTE: we import the cv2 & visdom modules here to avoid having it as a dependency
+    # NOTE: we import these modules here to avoid having it as a dependency
     # for the whole project.
     import cv2
     import visdom
+    import torch
+    import kornia
+    import numpy as np
 except ImportError:
     pass
 
-import torch
-import kornia
-import numpy as np
+
 
 from limbus.core import Component
 from limbus import widgets
@@ -121,7 +122,7 @@ class Viz:
         raise NotImplementedError
 
     @abstractmethod
-    def show_image(self, component: Component, title: str, image: torch.Tensor):
+    def show_image(self, component: Component, title: str, image: "torch.Tensor"):
         """Show an image.
 
         Args:
@@ -134,7 +135,7 @@ class Viz:
 
     @abstractmethod
     def show_images(self, component: Component, title: str,
-                    images: Union[torch.Tensor, List[torch.Tensor]],
+                    images: Union["torch.Tensor", List["torch.Tensor"]],
                     nrow: Optional[int] = None
                     ) -> None:
         """Show a batch of images.
@@ -203,7 +204,7 @@ class Visdom(Viz):
 
     @is_enabled
     @set_title
-    def show_image(self, component: Component, title: str, image: torch.Tensor) -> None:
+    def show_image(self, component: Component, title: str, image: "torch.Tensor") -> None:
         """Show an image.
 
         Args:
@@ -219,7 +220,7 @@ class Visdom(Viz):
     @is_enabled
     @set_title
     def show_images(self, component: Component, title: str,
-                    images: Union[torch.Tensor, List[torch.Tensor]],
+                    images: Union["torch.Tensor", List["torch.Tensor"]],
                     nrow: Optional[int] = None
                     ) -> None:
         """Show a batch of images.
@@ -269,7 +270,7 @@ class Console(Viz):
 
     @is_enabled
     @set_title
-    def show_image(self, component: Component, title: str, image: torch.Tensor):
+    def show_image(self, component: Component, title: str, image: "torch.Tensor"):
         """Show an image.
 
         Args:
@@ -283,7 +284,7 @@ class Console(Viz):
     @is_enabled
     @set_title
     def show_images(self, component: Component, title: str,
-                    images: Union[torch.Tensor, List[torch.Tensor]],
+                    images: Union["torch.Tensor", List["torch.Tensor"]],
                     nrow: Optional[int] = None
                     ) -> None:
         """Show a batch of images.
@@ -326,7 +327,7 @@ class OpenCV(Console):
 
     @is_enabled
     @set_title
-    def show_image(self, component: Component, title: str, image: torch.Tensor):
+    def show_image(self, component: Component, title: str, image: "torch.Tensor"):
         """Show an image.
 
         Args:
@@ -357,7 +358,7 @@ class OpenCV(Console):
     @is_enabled
     @set_title
     def show_images(self, component: Component, title: str,
-                    images: Union[torch.Tensor, List[torch.Tensor]],
+                    images: Union["torch.Tensor", List["torch.Tensor"]],
                     nrow: Optional[int] = None
                     ) -> None:
         """Show a batch of images.
