@@ -11,6 +11,12 @@ import contextlib
 
 import typeguard
 
+from limbus.core.states import ComponentState, ComponentStoppedError
+from limbus.core import async_utils
+# Note that Component class cannot be imported to avoid circular dependencies.
+if TYPE_CHECKING:
+    from limbus.core.component import Component
+
 SUBSCRIPTABLE_TYPES: List[type] = []
 try:
     import torch
@@ -23,14 +29,6 @@ try:
     SUBSCRIPTABLE_TYPES.append(np.ndarray)
 except ImportError:
     pass
-
-
-
-# Note that Component class cannot be imported to avoid circular dependencies.
-if TYPE_CHECKING:
-    from limbus.core.component import Component
-from limbus.core.states import ComponentState, ComponentStoppedError
-from limbus.core import async_utils
 
 
 class NoValue:
