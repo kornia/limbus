@@ -17,7 +17,6 @@ except ImportError:
     pass
 
 
-
 from limbus.core import Component
 from limbus import widgets
 

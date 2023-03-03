@@ -38,6 +38,7 @@ if USING_PIPELINE:
 else:
     # run 1 iteration using the asyncio loop
     print("Run with loop:")
+
     async def f():  # noqa: D103
         await asyncio.gather(c1(), t1(), t2(), stack(), show())
 
