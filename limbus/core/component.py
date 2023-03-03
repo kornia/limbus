@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
+
 class Module(base_cls):  # noqa: D101
     pass
 
@@ -317,7 +318,11 @@ class Component(Module):
             if len(self._inputs) == 0:
                 # RUNNING state is set once the input params are received, if there are not inputs the state is set here
                 self.set_state(ComponentState.RUNNING)
-            self.set_state(await super().__call__(*args, **kwargs))  # internally it calls the forward() method
+            if hasattr(super(), "__call__"):
+                # If the component inherits from nn.Module, the forward method is called by the __call__ method
+                self.set_state(await super().__call__(*args, **kwargs))
+            else:
+                self.set_state(await self.forward(*args, **kwargs))
         except ComponentStoppedError as e:
             self.set_state(e.state)
         except Exception as e:
