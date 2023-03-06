@@ -318,7 +318,7 @@ class Component(Module):
             if len(self._inputs) == 0:
                 # RUNNING state is set once the input params are received, if there are not inputs the state is set here
                 self.set_state(ComponentState.RUNNING)
-            if hasattr(super(), "__call__"):
+            if base_cls != object:  # at this moment the base class can be only nn.Module or object
                 # If the component inherits from nn.Module, the forward method is called by the __call__ method
                 self.set_state(await super().__call__(*args, **kwargs))
             else:
