@@ -9,9 +9,8 @@ import functools
 
 try:
     import torch.nn as nn
-    base_cls: Type = nn.Module
 except ImportError:
-    base_cls = object
+    pass
 
 from limbus.core.params import Params, InputParams, OutputParams
 from limbus.core.states import ComponentState, ComponentStoppedError
@@ -20,10 +19,6 @@ if TYPE_CHECKING:
     from limbus.core.pipeline import Pipeline
 
 log = logging.getLogger(__name__)
-
-
-class Module(base_cls):  # noqa: D101
-    pass
 
 
 # this is a decorator that will determine how many iterations must be run
@@ -93,7 +88,7 @@ class _ComponentState():
         self._verbose = value
 
 
-class Component(Module):
+class Component:
     """Base class to define a Limbus Component.
 
     Args:
@@ -318,11 +313,7 @@ class Component(Module):
             if len(self._inputs) == 0:
                 # RUNNING state is set once the input params are received, if there are not inputs the state is set here
                 self.set_state(ComponentState.RUNNING)
-            if base_cls != object:  # at this moment the base class can be only nn.Module or object
-                # If the component inherits from nn.Module, the forward method is called by the __call__ method
-                self.set_state(await super().__call__(*args, **kwargs))
-            else:
-                self.set_state(await self.forward(*args, **kwargs))
+                self.set_state(await self._run_forward(*args, **kwargs))
         except ComponentStoppedError as e:
             self.set_state(e.state)
         except Exception as e:
@@ -337,6 +328,9 @@ class Component(Module):
             return False
         # if there is not a pipeline, the component is executed only once
         return True
+
+    async def _run_forward(self, *args, **kwargs) -> ComponentState:
+        return await self.forward(*args, **kwargs)
 
     @abstractmethod
     async def forward(self, *args, **kwargs) -> ComponentState:
@@ -375,3 +369,14 @@ class Component(Module):
 
         """
         pass
+
+
+try:
+    class TorchComponent(Component, nn.Module):
+        """Base class for all the components that inherit from nn.Module."""
+        async def _run_forward(self, *args, **kwargs) -> ComponentState:
+            # If the component inherits from nn.Module, the forward method is called by the __call__ method
+            return await nn.Module.__call__(self, *args, **kwargs)
+except NameError:
+    # if nn.Module is not defined, the class is not defined
+    pass

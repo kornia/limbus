@@ -1,7 +1,7 @@
 import pytest
 import logging
 
-from limbus.core import Component, ComponentState, Pipeline
+from limbus.core import Component, ComponentState, Pipeline, TorchComponent
 from limbus.core.component import _ComponentState
 
 
@@ -35,18 +35,20 @@ class TestState:
 
 
 class TestComponent:
-    def test_smoke(self):
-        cmp = Component("yuhu")
+    @pytest.mark.parametrize("cls", [Component, TorchComponent])
+    def test_smoke(self, cls):
+        cmp = cls("yuhu")
         assert cmp.name == "yuhu"
         assert cmp.inputs is not None
         assert cmp.outputs is not None
         assert cmp.properties is not None
 
-    def test_set_properties(self):
-        class A(Component):
+    @pytest.mark.parametrize("cls", [Component, TorchComponent])
+    def test_set_properties(self, cls):
+        class A(cls):
             @staticmethod
             def register_properties(properties):
-                Component.register_properties(properties)
+                cls.register_properties(properties)
                 properties.declare("a", float, 1.)
                 properties.declare("b", float, 2.)
 
@@ -69,8 +71,9 @@ class TestComponent:
         assert p["a"] == float
         assert p["b"] == float
 
-    def test_register_inputs(self):
-        class A(Component):
+    @pytest.mark.parametrize("cls", [Component, TorchComponent])
+    def test_register_inputs(self, cls):
+        class A(cls):
             @staticmethod
             def register_inputs(inputs):
                 inputs.declare("a", float, 1.)
@@ -82,8 +85,9 @@ class TestComponent:
         assert cmp.inputs.a.value == 1.
         assert cmp.inputs.b.value == 2.
 
-    def test_register_outputs(self):
-        class A(Component):
+    @pytest.mark.parametrize("cls", [Component, TorchComponent])
+    def test_register_outputs(self, cls):
+        class A(cls):
             @staticmethod
             def register_outputs(outputs):
                 outputs.declare("a", float, 1.)
@@ -95,8 +99,9 @@ class TestComponent:
         assert cmp.outputs.a.value == 1.
         assert cmp.outputs.b.value == 2.
 
-    def test_init_from_component(self):
-        class A(Component):
+    @pytest.mark.parametrize("cls", [Component, TorchComponent])
+    def test_init_from_component(self, cls):
+        class A(cls):
             pass
 
         cmp = A("yuhu")
@@ -110,8 +115,9 @@ class TestComponent:
 
 @pytest.mark.usefixtures("event_loop_instance")
 class TestComponentWithPipeline:
-    def test_init_from_component_with_pipeline(self):
-        class A(Component):
+    @pytest.mark.parametrize("cls", [Component, TorchComponent])
+    def test_init_from_component_with_pipeline(self, cls):
+        class A(cls):
             @staticmethod
             def register_outputs(outputs):
                 outputs.declare("out", int)
@@ -120,7 +126,7 @@ class TestComponentWithPipeline:
                 self._outputs.out.send(1)
                 return ComponentState.OK
 
-        class B(Component):
+        class B(cls):
             @staticmethod
             def register_inputs(inputs):
                 inputs.declare("inp", int)
@@ -146,8 +152,9 @@ class TestComponentWithPipeline:
         assert b in pipeline._nodes
 
     @pytest.mark.parametrize("iters", [0, 1, 2])
-    def test_get_stopping_iteration(self, iters):
-        class A(Component):
+    @pytest.mark.parametrize("cls", [Component, TorchComponent])
+    def test_get_stopping_iteration(self, iters, cls):
+        class A(cls):
             async def forward(self):
                 return ComponentState.STOPPED
 
@@ -159,8 +166,9 @@ class TestComponentWithPipeline:
         assert pipeline.counter == 1
         assert cmp.stopping_iteration == iters
 
-    def test_stop_after_exception(self):
-        class A(Component):
+    @pytest.mark.parametrize("cls", [Component, TorchComponent])
+    def test_stop_after_exception(self, cls):
+        class A(cls):
             async def forward(self):
                 raise Exception("test")
 
@@ -172,8 +180,9 @@ class TestComponentWithPipeline:
         assert pipeline.counter == 1
         assert cmp.state == ComponentState.ERROR
 
-    def test_stop_after_stop(self):
-        class A(Component):
+    @pytest.mark.parametrize("cls", [Component, TorchComponent])
+    def test_stop_after_stop(self, cls):
+        class A(cls):
             async def forward(self):
                 return ComponentState.STOPPED
 
