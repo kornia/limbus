@@ -2,6 +2,10 @@
 from typing import List, Any
 import asyncio
 
+# example of how to change the base class for the component
+from limbus import core
+core.Component = core.set_component_base_class()
+
 from limbus.core import Component, Params, InputParams, OutputParams, ComponentState, VerboseMode
 from limbus.core.pipeline import Pipeline
 

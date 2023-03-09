@@ -1,7 +1,7 @@
 """Component definition."""
 from __future__ import annotations
 from abc import abstractmethod
-from typing import List, Optional, TYPE_CHECKING, Callable, Type
+from typing import List, Optional, TYPE_CHECKING, Callable, Type, Union
 import logging
 import asyncio
 import traceback
@@ -41,9 +41,9 @@ class _ComponentState():
         verbose (bool, optional): verbose state. Default: False.
 
     """
-    def __init__(self, component: Component, state: ComponentState, verbose: bool = False):
+    def __init__(self, component: BaseComponent, state: ComponentState, verbose: bool = False):
         self._state: ComponentState = state
-        self._component: Component = component
+        self._component: BaseComponent = component
         self._verbose: bool = verbose
 
     def __call__(self, state: Optional[ComponentState] = None, msg: Optional[str] = None) -> ComponentState:
@@ -88,7 +88,7 @@ class _ComponentState():
         self._verbose = value
 
 
-class Component:
+class BaseComponent:
     """Base class to define a Limbus Component.
 
     Args:
@@ -112,7 +112,7 @@ class Component:
         # Last execution to be run in the __call__ loop.
         self._stopping_iteration: int = 0  # 0 means run forever
 
-    def init_from_component(self, ref_component: Component) -> None:
+    def init_from_component(self, ref_component: BaseComponent) -> None:
         """Init basic execution params from another component.
 
         Args:
@@ -372,11 +372,46 @@ class Component:
 
 
 try:
-    class TorchComponent(Component, nn.Module):
+    class TorchComponent(BaseComponent, nn.Module):
         """Base class for all the components that inherit from nn.Module."""
+        def __init__(self, name: str):
+            BaseComponent.__init__(self, name)
+            nn.Module.__init__(self)
+
         async def _run_forward(self, *args, **kwargs) -> ComponentState:
             # If the component inherits from nn.Module, the forward method is called by the __call__ method
             return await nn.Module.__call__(self, *args, **kwargs)
 except NameError:
-    # if nn.Module is not defined, the class is not defined
     pass
+
+def set_component_base_class(base_class: Type = object):  # -> Type[Union[TorchComponent, BaseComponent]]:
+    """Get a component class inheriting from a given base class.
+    
+    At this moment only nn.Module and object are supported.
+    When limbus module is imported calling this method the base class of the component can be changed.
+    E.g.: `limbus.Componet = limbus.get_component_class()`.
+
+    Args:
+        base_class: Base class of the component.
+
+    Returns:
+        Component class.
+
+    """
+    try:
+        if base_class == nn.Module:
+            return TorchComponent
+    except:
+        pass
+    if base_class == object:
+        return BaseComponent
+    raise ValueError(f"Base class {base_class} not supported. Must be nn.Module or object.")
+
+# By default the component inherits from nn.Module if it is available.
+# To change this behaviour when limbus is imported add the next lines:
+# from limbus import core
+# core.Component = core.set_component_base_class()
+try:
+    Component = set_component_base_class(nn.Module)
+except:
+    Component = set_component_base_class()
