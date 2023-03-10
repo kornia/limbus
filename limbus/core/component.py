@@ -1,7 +1,7 @@
 """Component definition."""
 from __future__ import annotations
 from abc import abstractmethod
-from typing import List, Optional, TYPE_CHECKING, Callable, Type, Union
+from typing import List, Optional, TYPE_CHECKING, Callable, Type, Union, Any, Coroutine
 import logging
 import asyncio
 import traceback
@@ -124,6 +124,12 @@ class Component(base_class):
         self._exec_counter: int = 0  # Counter of executions.
         # Last execution to be run in the __call__ loop.
         self._stopping_iteration: int = 0  # 0 means run forever
+
+        # method called in _run_with_hooks to execute the component forward method
+        self._run_forward: Callable[..., Coroutine[Any, Any, ComponentState]] = self.forward
+        if nn.Module in Component.__mro__:
+            # If the component inherits from nn.Module, the forward method is called by the __call__ method
+            self._run_forward = nn.Module.__call__
 
     def init_from_component(self, ref_component: Component) -> None:
         """Init basic execution params from another component.
@@ -341,12 +347,6 @@ class Component(base_class):
             return False
         # if there is not a pipeline, the component is executed only once
         return True
-
-    async def _run_forward(self, *args, **kwargs) -> ComponentState:
-        if nn.Module in Component.__mro__:
-            # If the component inherits from nn.Module, the forward method is called by the __call__ method
-            return await nn.Module.__call__(self, *args, **kwargs)
-        return await self.forward(*args, **kwargs)
 
     @abstractmethod
     async def forward(self, *args, **kwargs) -> ComponentState:
