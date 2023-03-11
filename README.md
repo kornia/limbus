@@ -94,7 +94,7 @@ The `Component` class has the next main methods:
 - `register_inputs`: where you need to declare the input pins of your component.
 - `register_outputs`: where you need to declare the output pins of your component.
 - `register_properties`: where you can declare properties that can be changed during the execution.
-- `forward`: where you must to define the logic of your component (mandatory).
+- `forward`: where you must define the logic of your component (mandatory).
 
 For a detailed list of `Component` methods and attributes, please check `limbus/core/component.py`.
 
