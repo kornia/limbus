@@ -2,7 +2,7 @@
 from typing import List, Any
 import asyncio
 
-from limbus.core import Component, Params, InputParams, OutputParams, ComponentState, VerboseMode
+from limbus.core import Component, InputParams, OutputParams, ComponentState, VerboseMode, OutputParam, InputParam
 from limbus.core.pipeline import Pipeline
 
 
@@ -10,13 +10,24 @@ from limbus.core.pipeline import Pipeline
 # ---------------------
 class Add(Component):
     """Add two numbers."""
+    # NOTE: type definition is optional, but it helps with the intellisense. ;)
+    class InputsTyping(OutputParams):  # noqa: D106
+        a: InputParam
+        b: InputParam
+
+    class OutputsTyping(OutputParams):  # noqa: D106
+        out: OutputParam
+
+    inputs: InputsTyping  # type: ignore
+    outputs: OutputsTyping  # type: ignore
+
     @staticmethod
-    def register_inputs(inputs: Params) -> None:  # noqa: D102
+    def register_inputs(inputs: InputParams) -> None:  # noqa: D102
         inputs.declare("a", int)
         inputs.declare("b", int)
 
     @staticmethod
-    def register_outputs(outputs: Params) -> None:  # noqa: D102
+    def register_outputs(outputs: OutputParams) -> None:  # noqa: D102
         outputs.declare("out", int)
 
     async def forward(self) -> ComponentState:  # noqa: D102
@@ -28,8 +39,14 @@ class Add(Component):
 
 class Printer(Component):
     """Prints the input to the console."""
+    # NOTE: type definition is optional, but it helps with the intellisense. ;)
+    class InputsTyping(OutputParams):  # noqa: D106
+        inp: InputParam
+
+    inputs: InputsTyping  # type: ignore
+
     @staticmethod
-    def register_inputs(inputs: Params) -> None:  # noqa: D102
+    def register_inputs(inputs: InputParams) -> None:  # noqa: D102
         inputs.declare("inp", Any)
 
     async def forward(self) -> ComponentState:  # noqa: D102
@@ -40,6 +57,12 @@ class Printer(Component):
 
 class Data(Component):
     """Data source of inf numbers."""
+    # NOTE: type definition is optional, but it helps with the intellisense. ;)
+    class OutputsTyping(OutputParams):  # noqa: D106
+        out: OutputParam
+
+    outputs: OutputsTyping  # type: ignore
+
     def __init__(self, name: str, initial_value: int = 0):
         super().__init__(name)
         self._initial_value: int = initial_value
@@ -57,6 +80,16 @@ class Data(Component):
 
 class Acc(Component):
     """Accumulate data in a list."""
+    # NOTE: type definition is optional, but it helps with the intellisense. ;)
+    class InputsTyping(OutputParams):  # noqa: D106
+        inp: InputParam
+
+    class OutputsTyping(OutputParams):  # noqa: D106
+        out: OutputParam
+
+    inputs: InputsTyping  # type: ignore
+    outputs: OutputsTyping  # type: ignore
+
     def __init__(self, name: str, elements: int = 1):
         super().__init__(name)
         self._elements: int = elements

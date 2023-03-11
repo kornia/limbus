@@ -1,6 +1,6 @@
 from limbus.core.component import Component, iterations_manager
 from limbus.core.states import ComponentState, PipelineState, VerboseMode
-from limbus.core.param import NoValue, Param, Reference
+from limbus.core.param import NoValue, Param, Reference, InputParam, OutputParam
 from limbus.core.params import Params, InputParams, OutputParams
 from limbus.core.pipeline import Pipeline
 from limbus.core.app import App
@@ -18,5 +18,7 @@ __all__ = [
     "Reference",
     "InputParams",
     "OutputParams",
+    "InputParam",
+    "OutputParam",
     "Param",
     "NoValue"]
