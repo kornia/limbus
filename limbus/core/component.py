@@ -22,15 +22,15 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
+base_class: Type = object
 if config.COMPONENT_TYPE == "generic":
-    base_class: Type = object
+    pass
 elif config.COMPONENT_TYPE == "torch":
     try:
         base_class = nn.Module
     except NameError:
         log.error("Torch not installed. Using generic base class.")
 else:
-    base_class = object
     log.error("Invalid component type. Using generic base class.")
 
 
