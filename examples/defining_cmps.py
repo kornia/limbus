@@ -2,12 +2,12 @@
 from typing import List, Any
 import asyncio
 
-# example of how to change the base class for the component
-from limbus import core
-core.Component = core.set_component_base_class()
+# If you want to change the limbus config you need to do it before importing any limbus module!!!
+from limbus_config import config
+config.COMPONENT_TYPE = "torch"
 
-from limbus.core import Component, Params, InputParams, OutputParams, ComponentState, VerboseMode
-from limbus.core.pipeline import Pipeline
+from limbus.core import Component, Params, InputParams, OutputParams, ComponentState, VerboseMode  # noqa: E402
+from limbus.core.pipeline import Pipeline  # noqa: E402
 
 
 # define the components
