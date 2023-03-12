@@ -137,6 +137,15 @@ class Add(Component):
         return ComponentState.OK
 ```
 
+**Note** that `Component` can inherint from `nn.Module`. By default inherints from `object`.
+
+To change the inheritance, before importing any other `limbus` module, set the `COMPONENT_TYPE` variable as:
+
+```python
+from limbus_config import config
+config.COMPONENT_TYPE = "torch"
+```
+
 ## Ecosystem
 
 Limbus is a core technology to easily build different components and create generic pipelines. In the following list, you can find different examples 
