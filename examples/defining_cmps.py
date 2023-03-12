@@ -3,7 +3,7 @@ from typing import List, Any
 import asyncio
 
 # If you want to change the limbus config you need to do it before importing any limbus module!!!
-import limbus.config as config
+from limbus_config import config
 config.COMPONENT_TYPE = "torch"
 
 from limbus.core import Component, Params, InputParams, OutputParams, ComponentState, VerboseMode  # noqa: E402

@@ -2,7 +2,7 @@
 
 Usage:
     Before importing any other Limbus module, set the COMPONENT_TYPE variable as:
-    > import limbus.config as config
+    > from limbus_config import config
     > config.COMPONENT_TYPE = "torch"
 
 

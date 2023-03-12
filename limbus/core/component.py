@@ -12,7 +12,7 @@ try:
 except ImportError:
     pass
 
-from limbus import config
+from limbus_config import config
 from limbus.core.params import Params, InputParams, OutputParams
 from limbus.core.states import ComponentState, ComponentStoppedError
 # Note that Pipeline class cannot be imported to avoid circular dependencies.
