@@ -9,6 +9,7 @@ config.COMPONENT_TYPE = "torch"
 from limbus.core import Component, InputParams, OutputParams, ComponentState, OutputParam, InputParam  # noqa: E402
 from limbus.core import Pipeline, VerboseMode  # noqa: E402
 
+
 # define the components
 # ---------------------
 class Add(Component):
