@@ -106,7 +106,7 @@ Let's see a very simple example that sums 2 integers:
 class Add(Component):
     """Add two numbers."""
     # NOTE: type definition is optional, but it helps with the intellisense. ;)
-    class InputsTyping(OutputParams):
+    class InputsTyping(InputParams):
         a: InputParam
         b: InputParam
 
