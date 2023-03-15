@@ -106,7 +106,7 @@ Let's see a very simple example that sums 2 integers:
 class Add(Component):
     """Add two numbers."""
     # NOTE: type definition is optional, but it helps with the intellisense. ;)
-    class InputsTyping(OutputParams):
+    class InputsTyping(InputParams):
         a: InputParam
         b: InputParam
 
@@ -135,6 +135,15 @@ class Add(Component):
         )
         await self.outputs.out.send(a + b)
         return ComponentState.OK
+```
+
+**Note** that `Component` can inherint from `nn.Module`. By default inherints from `object`.
+
+To change the inheritance, before importing any other `limbus` module, set the `COMPONENT_TYPE` variable as:
+
+```python
+from limbus_config import config
+config.COMPONENT_TYPE = "torch"
 ```
 
 ## Ecosystem

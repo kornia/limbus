@@ -2,8 +2,12 @@
 from typing import List, Any
 import asyncio
 
-from limbus.core import Component, InputParams, OutputParams, ComponentState, VerboseMode, OutputParam, InputParam
-from limbus.core.pipeline import Pipeline
+# If you want to change the limbus config you need to do it before importing any limbus module!!!
+from limbus_config import config
+config.COMPONENT_TYPE = "torch"
+
+from limbus.core import Component, InputParams, OutputParams, ComponentState, OutputParam, InputParam  # noqa: E402
+from limbus.core import Pipeline, VerboseMode  # noqa: E402
 
 
 # define the components

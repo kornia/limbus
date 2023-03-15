@@ -1,22 +1,37 @@
 """Component definition."""
 from __future__ import annotations
 from abc import abstractmethod
-from typing import List, Optional, TYPE_CHECKING, Callable
+from typing import List, Optional, TYPE_CHECKING, Callable, Type, Union, Any, Coroutine
 import logging
 import asyncio
 import traceback
 import functools
 
-import torch.nn as nn
+try:
+    import torch.nn as nn
+except ImportError:
+    pass
 
+from limbus_config import config
 from limbus.core.params import Params, InputParams, OutputParams
 from limbus.core.states import ComponentState, ComponentStoppedError
 # Note that Pipeline class cannot be imported to avoid circular dependencies.
 if TYPE_CHECKING:
     from limbus.core.pipeline import Pipeline
 
-
 log = logging.getLogger(__name__)
+
+
+base_class: Type = object
+if config.COMPONENT_TYPE == "generic":
+    pass
+elif config.COMPONENT_TYPE == "torch":
+    try:
+        base_class = nn.Module
+    except NameError:
+        log.error("Torch not installed. Using generic base class.")
+else:
+    log.error("Invalid component type. Using generic base class.")
 
 
 # this is a decorator that will determine how many iterations must be run
@@ -86,7 +101,7 @@ class _ComponentState():
         self._verbose = value
 
 
-class Component(nn.Module):
+class Component(base_class):
     """Base class to define a Limbus Component.
 
     Args:
@@ -109,6 +124,12 @@ class Component(nn.Module):
         self._exec_counter: int = 0  # Counter of executions.
         # Last execution to be run in the __call__ loop.
         self._stopping_iteration: int = 0  # 0 means run forever
+
+        # method called in _run_with_hooks to execute the component forward method
+        self._run_forward: Callable[..., Coroutine[Any, Any, ComponentState]] = self.forward
+        if nn.Module in Component.__mro__:
+            # If the component inherits from nn.Module, the forward method is called by the __call__ method
+            self._run_forward = nn.Module.__call__
 
     def init_from_component(self, ref_component: Component) -> None:
         """Init basic execution params from another component.
@@ -311,7 +332,7 @@ class Component(nn.Module):
             if len(self._inputs) == 0:
                 # RUNNING state is set once the input params are received, if there are not inputs the state is set here
                 self.set_state(ComponentState.RUNNING)
-            self.set_state(await super().__call__(*args, **kwargs))  # internally it calls the forward() method
+            self.set_state(await self._run_forward(*args, **kwargs))
         except ComponentStoppedError as e:
             self.set_state(e.state)
         except Exception as e:
