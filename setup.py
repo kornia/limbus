@@ -8,7 +8,7 @@ setup(name='limbus',
       author='Luis Ferraz',
       url='https://github.com/kornia/limbus',
       install_requires=[
-          'typeguard',
+          'typeguard<3.0.0',
       ],
       extras_require={
           'dev': [
