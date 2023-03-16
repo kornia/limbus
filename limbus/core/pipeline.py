@@ -1,6 +1,6 @@
 """Components manager to connect, traverse and execute pipelines."""
 from __future__ import annotations
-from typing import List, Union, Set, Coroutine, Any, Optional
+from typing import List, Union, Set, Coroutine, Any, Optional, Callable
 import logging
 import asyncio
 
@@ -66,6 +66,103 @@ class Pipeline:
         # depending on the graph to be executed it can require to recreate tasks (e.g. when a given component requires
         # several runs from a previous one).
         self._min_number_of_iters_to_run: int = 0  # 0 means until the end of the pipeline
+        # user defined hooks
+        self._before_component_user_hook: Optional[Callable] = None
+        self._after_component_user_hook: Optional[Callable] = None
+        self._before_iteration_user_hook: Optional[Callable] = None
+        self._after_iteration_user_hook: Optional[Callable] = None
+        self._before_pipeline_user_hook: Optional[Callable] = None
+        self._after_pipeline_user_hook: Optional[Callable] = None
+
+    def set_before_pipeline_user_hook(self, hook: Optional[Callable]) -> None:
+        """Set a hook to be executed before the pipeline execution.
+
+        This callable must have a single parameter which is the state of the pipeline at the begining of the pipeline.
+        Moreover it must be async.
+
+        Prototype: async def hook_name(state: PipelineState).
+        """
+        self._before_pipeline_hook = hook
+
+    @property
+    def before_pipeline_user_hook(self) -> Optional[Callable]:
+        """Get the before pipeline user hook."""
+        return self._before_pipeline_user_hook
+
+    def set_after_pipeline_user_hook(self, hook: Optional[Callable]) -> None:
+        """Set a hook to be executed after the pipeline execution.
+
+        This callable must have a single parameter which is the state of the pipeline at the end of the pipeline.
+        Moreover it must be async.
+
+        Prototype: async def hook_name(state: PipelineState).
+        """
+        self._after_pipeline_hook = hook
+
+    @property
+    def after_pipeline_user_hook(self) -> Optional[Callable]:
+        """Get the after pipeline user hook."""
+        return self._after_pipeline_user_hook
+
+    def set_before_iteration_user_hook(self, hook: Optional[Callable]) -> None:
+        """Set a hook to be executed before each iteration.
+
+        This callable must have a single parameter which is an int denoting the iter being executed.
+        Moreover it must be async.
+
+        Prototype: async def hook_name(counter: int).
+        """
+        self._before_iteration_hook = hook
+
+    @property
+    def before_iteration_user_hook(self) -> Optional[Callable]:
+        """Get the before iteration user hook."""
+        return self._before_iteration_user_hook
+
+    def set_after_iteration_user_hook(self, hook: Optional[Callable]) -> None:
+        """Set a hook to be executed after each iteration.
+
+        This callable must have a single parameter which is the state of the pipeline at the end of the iteration.
+        Moreover it must be async.
+
+        Prototype: async def hook_name(state: PipelineState).
+        """
+        self._after_iteration_hook = hook
+
+    @property
+    def after_iteration_user_hook(self) -> Optional[Callable]:
+        """Get the after iteration user hook."""
+        return self._after_iteration_user_hook
+
+    def set_before_component_user_hook(self, hook: Optional[Callable]) -> None:
+        """Set a hook to be executed before each component.
+
+        This callable must have a single parameter which is the component being executed.
+        Moreover it must be async.
+
+        Prototype: async def hook_name(obj: Componet).
+        """
+        self._before_component_hook = hook
+
+    @property
+    def before_component_user_hook(self) -> Optional[Callable]:
+        """Get the before component user hook."""
+        return self._before_component_user_hook
+
+    def set_after_component_user_hook(self, hook: Optional[Callable]) -> None:
+        """Set a hook to be executed after each component.
+
+        This callable must have 2 parameters which are the component being executed and its state
+        after the execution. Moreover it must be async.
+
+        Prototype: async def hook_name(obj: Componet, state: ComponentState).
+        """
+        self._after_component_hook = hook
+
+    @property
+    def after_component_user_hook(self) -> Optional[Callable]:
+        """Get the after component user hook."""
+        return self._after_component_user_hook
 
     def get_component_stopping_iteration(self, component: Component) -> int:
         """Compute the iteration where the __call__ loop of the component will be stopped.
