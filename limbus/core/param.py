@@ -529,9 +529,13 @@ class InputParam(Param):
                 ref.consumed.set()  # denote that the param is consumed
                 ref.sent.clear()  # allow to know to the sender that it can send again
                 self._parent.set_state(ComponentState.RUNNING)
+                if self._parent.pipeline and self._parent.pipeline.before_component_user_hook:
+                    await self._parent.pipeline.before_component_user_hook(self._parent)
             return value
         else:
             self._parent.set_state(ComponentState.RUNNING)
+            if self._parent.pipeline and self._parent.pipeline.before_component_user_hook:
+                    await self._parent.pipeline.before_component_user_hook(self._parent)
             return self.value
 
 

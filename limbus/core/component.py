@@ -341,6 +341,8 @@ class Component(base_class):
         try:
             if len(self._inputs) == 0:
                 # RUNNING state is set once the input params are received, if there are not inputs the state is set here
+                if self._pipeline is not None and self._pipeline.before_component_user_hook:
+                    await self._pipeline.before_component_user_hook(self)
                 self.set_state(ComponentState.RUNNING)
             self.set_state(await self._run_forward(*args, **kwargs))
         except ComponentStoppedError as e:
@@ -352,6 +354,8 @@ class Component(base_class):
         if self._pipeline is not None:
             # after component hook
             await self._pipeline.after_component_hook(self)
+            if self._pipeline.after_component_user_hook:
+                await self._pipeline.after_component_user_hook(self)
             if self._stop_if_needed():
                 return True
             return False

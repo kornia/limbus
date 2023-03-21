@@ -82,7 +82,7 @@ class Pipeline:
 
         Prototype: async def hook_name(state: PipelineState).
         """
-        self._before_pipeline_hook = hook
+        self._before_pipeline_user_hook = hook
 
     @property
     def before_pipeline_user_hook(self) -> Optional[Callable]:
@@ -97,7 +97,7 @@ class Pipeline:
 
         Prototype: async def hook_name(state: PipelineState).
         """
-        self._after_pipeline_hook = hook
+        self._after_pipeline_user_hook = hook
 
     @property
     def after_pipeline_user_hook(self) -> Optional[Callable]:
@@ -112,7 +112,7 @@ class Pipeline:
 
         Prototype: async def hook_name(counter: int).
         """
-        self._before_iteration_hook = hook
+        self._before_iteration_user_hook = hook
 
     @property
     def before_iteration_user_hook(self) -> Optional[Callable]:
@@ -127,7 +127,7 @@ class Pipeline:
 
         Prototype: async def hook_name(state: PipelineState).
         """
-        self._after_iteration_hook = hook
+        self._after_iteration_user_hook = hook
 
     @property
     def after_iteration_user_hook(self) -> Optional[Callable]:
@@ -142,7 +142,7 @@ class Pipeline:
 
         Prototype: async def hook_name(obj: Componet).
         """
-        self._before_component_hook = hook
+        self._before_component_user_hook = hook
 
     @property
     def before_component_user_hook(self) -> Optional[Callable]:
@@ -152,12 +152,12 @@ class Pipeline:
     def set_after_component_user_hook(self, hook: Optional[Callable]) -> None:
         """Set a hook to be executed after each component.
 
-        This callable must have 2 parameters which are the component being executed and its state
-        after the execution. Moreover it must be async.
+        This callable must have a single parameter which is the component being executed.
+        Moreover it must be async.
 
-        Prototype: async def hook_name(obj: Componet, state: ComponentState).
+        Prototype: async def hook_name(obj: Componet).
         """
-        self._after_component_hook = hook
+        self._after_component_user_hook = hook
 
     @property
     def after_component_user_hook(self) -> Optional[Callable]:
