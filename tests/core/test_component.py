@@ -170,7 +170,7 @@ class TestComponentWithPipeline:
         pipeline.run(2)
         assert cmp.counter == 1
         assert pipeline.counter == 1
-        assert cmp.state == ComponentState.ERROR
+        assert cmp.state[0] == ComponentState.ERROR
 
     def test_stop_after_stop(self):
         class A(Component):
@@ -183,4 +183,4 @@ class TestComponentWithPipeline:
         pipeline.run(2)
         assert cmp.counter == 1
         assert pipeline.counter == 1
-        assert cmp.state == ComponentState.STOPPED
+        assert cmp.state[0] == ComponentState.STOPPED

@@ -1,7 +1,7 @@
 """Component definition."""
 from __future__ import annotations
 from abc import abstractmethod
-from typing import List, Optional, TYPE_CHECKING, Callable, Type, Union, Any, Coroutine
+from typing import List, Optional, TYPE_CHECKING, Callable, Type, Union, Any, Coroutine, Tuple
 import logging
 import asyncio
 import traceback
@@ -56,6 +56,7 @@ class _ComponentState():
     """
     def __init__(self, component: Component, state: ComponentState, verbose: bool = False):
         self._state: ComponentState = state
+        self._message: Optional[str] = None
         self._component: Component = component
         self._verbose: bool = verbose
 
@@ -74,16 +75,22 @@ class _ComponentState():
         """
         if state is not None:
             self._state = state
-            self._logger(self._component.name, self._component.counter, self._state, msg)
+            self._message = msg
+            self._logger()
         return self._state
 
-    def _logger(self, comp_name: str, iters: int, state: ComponentState, msg: Optional[str]) -> None:
+    def _logger(self) -> None:
         """Log the message with the component name, iteration number and state."""
         if self._verbose:
-            if msg is None:
-                log.info(f" {comp_name}({iters}): {state.name}")
+            if self._message is None:
+                log.info(f" {self._component.name}({self._component.counter}): {self._state.name}")
             else:
-                log.info(f" {comp_name}({iters}): {state.name} ({msg})")
+                log.info(f" {self._component.name}({self._component.counter}): {self._state.name} ({self._message})")
+
+    @property
+    def message(self) -> Optional[str]:
+        """Get the message associated to the state."""
+        return self._message
 
     @property
     def state(self) -> ComponentState:
@@ -157,9 +164,9 @@ class Component(base_class):
         return self._stopping_iteration
 
     @property
-    def state(self) -> ComponentState:
-        """Get the current state of the component."""
-        return self._state.state
+    def state(self) -> Tuple[ComponentState, Optional[str]]:
+        """Get the current state of the component and its associated message."""
+        return (self._state.state, self._state.message)
 
     def set_state(self, state: ComponentState, msg: Optional[str] = None) -> None:
         """Set the state of the component.
@@ -309,15 +316,15 @@ class Component(base_class):
 
     def is_stopped(self) -> bool:
         """Check if the component is stopped or is going to be stopped."""
-        if self.state in [ComponentState.STOPPED, ComponentState.STOPPED_AT_ITER,
-                          ComponentState.ERROR, ComponentState.FORCED_STOP]:
+        if self.state[0] in [ComponentState.STOPPED, ComponentState.STOPPED_AT_ITER,
+                             ComponentState.ERROR, ComponentState.FORCED_STOP]:
             return True
         return False
 
     def _stop_if_needed(self) -> bool:
         """Stop the component if it is required."""
         if self.is_stopped():
-            if self.state is not ComponentState.STOPPED_AT_ITER:
+            if self.state[0] is not ComponentState.STOPPED_AT_ITER:
                 # in this case we need to force the stop of the component. When it is stopped at a given iter
                 # the pipeline ends without forcing anything.
                 self._stop_component()

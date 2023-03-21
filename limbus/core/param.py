@@ -513,8 +513,8 @@ class InputParam(Param):
                 assert ref.param is not None
                 assert ref.param.parent is not None
                 # if we want to stop at a given min iter then it is posible to require more iters
-                if ref.param.parent.state is not ComponentState.STOPPED_AT_ITER and ref.param.parent.is_stopped():
-                    raise ComponentStoppedError(ref.param.parent.state)
+                if ref.param.parent.state[0] is not ComponentState.STOPPED_AT_ITER and ref.param.parent.is_stopped():
+                    raise ComponentStoppedError(ref.param.parent.state[0])
 
             for ref in self.references:
                 # NOTE: depending on how the value is consumed we should apply a copy here.
@@ -563,5 +563,5 @@ class OutputParam(Param):
             assert ref.param is not None
             assert ref.param.parent is not None
             # if we want to stop at a given min iter then it is posible to require more iters
-            if ref.param.parent.state is not ComponentState.STOPPED_AT_ITER and ref.param.parent.is_stopped():
-                raise ComponentStoppedError(ref.param.parent.state)
+            if ref.param.parent.state[0] is not ComponentState.STOPPED_AT_ITER and ref.param.parent.is_stopped():
+                raise ComponentStoppedError(ref.param.parent.state[0])

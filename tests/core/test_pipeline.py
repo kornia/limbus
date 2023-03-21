@@ -112,8 +112,8 @@ class TestPipeline:
             assert pipeline._stop_event.is_set() is True
             assert pipeline.state == PipelineState.FORCED_STOP
             await asyncio.gather(t)
-            assert c1.state == ComponentState.FORCED_STOP
-            assert show0.state == ComponentState.FORCED_STOP
+            assert c1.state[0] == ComponentState.FORCED_STOP
+            assert show0.state[0] == ComponentState.FORCED_STOP
         await task()
         assert pipeline.counter > 0
         assert pipeline.counter < 5
