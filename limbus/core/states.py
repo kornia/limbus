@@ -48,4 +48,3 @@ class PipelineState(Enum):
     RUNNING = 5
     INITIALIZING = 6
     FORCED_STOP = 7
-    CREATED = 8

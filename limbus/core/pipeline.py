@@ -59,7 +59,7 @@ class Pipeline:
         self._nodes: Set[Component] = set()  # note that it does not contain all the nodes
         self._resume_event: asyncio.Event = asyncio.Event()
         self._stop_event: asyncio.Event = asyncio.Event()
-        self._state: _PipelineState = _PipelineState(PipelineState.CREATED)
+        self._state: _PipelineState = _PipelineState(PipelineState.INITIALIZING)
         self._counter: int = 0  # number of iterations executed in the pipeline (== component with more executions).
         # Number of times each component will be run at least.
         # This feature should be mainly used for debugging purposes. It can make the processing a bit slower and
@@ -293,9 +293,6 @@ class Pipeline:
                 node.set_pipeline(self)
                 tasks.append(node())
             self.resume()
-            if len(self._nodes) == 0:
-                self._state(PipelineState.ERROR, "No components added to the pipeline")
-                return
             await asyncio.gather(*tasks)
             # check if there are pending tasks
             pending_tasks: List = []
@@ -305,11 +302,25 @@ class Pipeline:
                     pending_tasks.append(t)
             await asyncio.gather(*pending_tasks)
 
-        self._state(PipelineState.INITIALIZING)
-        await start()
-        if self._state.state in [PipelineState.FORCED_STOP, PipelineState.ERROR]:
+        self._state(PipelineState.STARTED)
+        if len(self._nodes) == 0:
+            self._state(PipelineState.EMPTY, "No components added to the pipeline")
+
+        if self.before_pipeline_user_hook is not None:
+            # even if the pipeline is empty we run the hook
+            await self.before_pipeline_user_hook(self.state)
+
+        if self._state.state == PipelineState.EMPTY:
+            # if it is empty we do not run the pipeline
             return self._state.state
-        self._state(PipelineState.ENDED)
+
+        await start()
+
+        # set the end state if there was not set before
+        if self._state.state not in [PipelineState.FORCED_STOP, PipelineState.ERROR, PipelineState.EMPTY]:
+            self._state(PipelineState.ENDED)
+        if self.after_pipeline_user_hook is not None:
+            await self.after_pipeline_user_hook(self.state)
         return self._state.state
 
     def run(self, iters: int = 0) -> PipelineState:
