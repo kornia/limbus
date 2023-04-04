@@ -1,6 +1,6 @@
 """Components manager to connect, traverse and execute pipelines."""
 from __future__ import annotations
-from typing import List, Union, Set, Coroutine, Any, Optional, Callable
+from typing import Coroutine, Any, Callable
 import logging
 import asyncio
 
@@ -18,7 +18,7 @@ class _PipelineState():
         self._state: PipelineState = state
         self._verbose: VerboseMode = verbose
 
-    def __call__(self, state: PipelineState, msg: Optional[str] = None) -> None:
+    def __call__(self, state: PipelineState, msg: None | str = None) -> None:
         """Set the state of the pipeline.
 
         Args:
@@ -29,7 +29,7 @@ class _PipelineState():
         self._state = state
         self._logger(self._state, msg)
 
-    def _logger(self, state: PipelineState, msg: Optional[str]) -> None:
+    def _logger(self, state: PipelineState, msg: None | str) -> None:
         """Log the message with the pipeline state."""
         if self._verbose != VerboseMode.DISABLED:
             if msg is None:
@@ -56,7 +56,7 @@ class _PipelineState():
 class Pipeline:
     """Class to create and execute a pipeline of Limbus Components."""
     def __init__(self) -> None:
-        self._nodes: Set[Component] = set()  # note that it does not contain all the nodes
+        self._nodes: set[Component] = set()  # note that it does not contain all the nodes
         self._resume_event: asyncio.Event = asyncio.Event()
         self._stop_event: asyncio.Event = asyncio.Event()
         self._state: _PipelineState = _PipelineState(PipelineState.INITIALIZING)
@@ -67,14 +67,14 @@ class Pipeline:
         # several runs from a previous one).
         self._min_number_of_iters_to_run: int = 0  # 0 means until the end of the pipeline
         # user defined hooks
-        self._before_component_user_hook: Optional[Callable] = None
-        self._after_component_user_hook: Optional[Callable] = None
-        self._before_iteration_user_hook: Optional[Callable] = None
-        self._after_iteration_user_hook: Optional[Callable] = None
-        self._before_pipeline_user_hook: Optional[Callable] = None
-        self._after_pipeline_user_hook: Optional[Callable] = None
+        self._before_component_user_hook: None | Callable = None
+        self._after_component_user_hook: None | Callable = None
+        self._before_iteration_user_hook: None | Callable = None
+        self._after_iteration_user_hook: None | Callable = None
+        self._before_pipeline_user_hook: None | Callable = None
+        self._after_pipeline_user_hook: None | Callable = None
 
-    def set_before_pipeline_user_hook(self, hook: Optional[Callable]) -> None:
+    def set_before_pipeline_user_hook(self, hook: None | Callable) -> None:
         """Set a hook to be executed before the pipeline execution.
 
         This callable must have a single parameter which is the state of the pipeline at the begining of the pipeline.
@@ -85,11 +85,11 @@ class Pipeline:
         self._before_pipeline_user_hook = hook
 
     @property
-    def before_pipeline_user_hook(self) -> Optional[Callable]:
+    def before_pipeline_user_hook(self) -> None | Callable:
         """Get the before pipeline user hook."""
         return self._before_pipeline_user_hook
 
-    def set_after_pipeline_user_hook(self, hook: Optional[Callable]) -> None:
+    def set_after_pipeline_user_hook(self, hook: None | Callable) -> None:
         """Set a hook to be executed after the pipeline execution.
 
         This callable must have a single parameter which is the state of the pipeline at the end of the pipeline.
@@ -100,11 +100,11 @@ class Pipeline:
         self._after_pipeline_user_hook = hook
 
     @property
-    def after_pipeline_user_hook(self) -> Optional[Callable]:
+    def after_pipeline_user_hook(self) -> None | Callable:
         """Get the after pipeline user hook."""
         return self._after_pipeline_user_hook
 
-    def set_before_iteration_user_hook(self, hook: Optional[Callable]) -> None:
+    def set_before_iteration_user_hook(self, hook: None | Callable) -> None:
         """Set a hook to be executed before each iteration.
 
         This callable must have a single parameter which is an int denoting the iter being executed.
@@ -115,11 +115,11 @@ class Pipeline:
         self._before_iteration_user_hook = hook
 
     @property
-    def before_iteration_user_hook(self) -> Optional[Callable]:
+    def before_iteration_user_hook(self) -> None | Callable:
         """Get the before iteration user hook."""
         return self._before_iteration_user_hook
 
-    def set_after_iteration_user_hook(self, hook: Optional[Callable]) -> None:
+    def set_after_iteration_user_hook(self, hook: None | Callable) -> None:
         """Set a hook to be executed after each iteration.
 
         This callable must have a single parameter which is the state of the pipeline at the end of the iteration.
@@ -130,11 +130,11 @@ class Pipeline:
         self._after_iteration_user_hook = hook
 
     @property
-    def after_iteration_user_hook(self) -> Optional[Callable]:
+    def after_iteration_user_hook(self) -> None | Callable:
         """Get the after iteration user hook."""
         return self._after_iteration_user_hook
 
-    def set_before_component_user_hook(self, hook: Optional[Callable]) -> None:
+    def set_before_component_user_hook(self, hook: None | Callable) -> None:
         """Set a hook to be executed before each component.
 
         This callable must have a single parameter which is the component being executed.
@@ -145,11 +145,11 @@ class Pipeline:
         self._before_component_user_hook = hook
 
     @property
-    def before_component_user_hook(self) -> Optional[Callable]:
+    def before_component_user_hook(self) -> None | Callable:
         """Get the before component user hook."""
         return self._before_component_user_hook
 
-    def set_after_component_user_hook(self, hook: Optional[Callable]) -> None:
+    def set_after_component_user_hook(self, hook: None | Callable) -> None:
         """Set a hook to be executed after each component.
 
         This callable must have a single parameter which is the component being executed.
@@ -160,7 +160,7 @@ class Pipeline:
         self._after_component_user_hook = hook
 
     @property
-    def after_component_user_hook(self) -> Optional[Callable]:
+    def after_component_user_hook(self) -> None | Callable:
         """Get the after component user hook."""
         return self._after_component_user_hook
 
@@ -219,7 +219,7 @@ class Pipeline:
         """Get the state of the pipeline."""
         return self._state.state
 
-    def add_nodes(self, components: Union[Component, List[Component]]) -> None:
+    def add_nodes(self, components: Component | list[Component]) -> None:
         """Add components to the pipeline.
 
         Note: At least one component per graph must be added to be able to run the pipeline. The pipeline will
@@ -288,14 +288,14 @@ class Pipeline:
         self._stop_event.clear()
 
         async def start() -> None:
-            tasks: List[Coroutine[Any, Any, None]] = []
+            tasks: list[Coroutine[Any, Any, None]] = []
             for node in self._nodes:
                 node.set_pipeline(self)
                 tasks.append(node())
             self.resume()
             await asyncio.gather(*tasks)
             # check if there are pending tasks
-            pending_tasks: List = []
+            pending_tasks: list = []
             for node in self._nodes:
                 t = async_utils.get_task_if_exists(node)
                 if t is not None:
