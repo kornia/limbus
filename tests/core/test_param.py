@@ -1,5 +1,5 @@
 import pytest
-from typing import Any, List, Sequence, Iterable, Tuple
+from typing import Any, Sequence, Iterable
 import asyncio
 
 import torch
@@ -153,13 +153,13 @@ class TestParam:
 
     def test_get_iterable_input_value(self):
         # only torch.Tensor can be iterable at this moment
-        p = Param("a", tp=List[torch.Tensor])
+        p = Param("a", tp=list[torch.Tensor])
         p.container = IterableInputContainers(IterableContainer(Container(torch.tensor(1)), 1))
         p.container.add(IterableContainer(Container(torch.tensor(2)), 0))
         assert p.value == [torch.tensor(2), torch.tensor(1)]
 
     def test_select(self):
-        p = Param("a", List[torch.Tensor], value=[torch.tensor(1), torch.tensor(1)])
+        p = Param("a", list[torch.Tensor], value=[torch.tensor(1), torch.tensor(1)])
         assert p._is_subscriptable
         iter_param = p.select(0)
         assert isinstance(iter_param, IterableParam)
@@ -168,7 +168,7 @@ class TestParam:
         assert iter_param.iter_container.value == 1
 
     def test_connect_iterparam_param_no_select_raise_error(self):
-        p0 = Param("a", List[torch.Tensor])
+        p0 = Param("a", list[torch.Tensor])
         p1 = Param("b")
         # TODO: this check is temporary disabled because we should allow connect iterparam with iterparam
         # with pytest.raises(ValueError):
@@ -177,7 +177,7 @@ class TestParam:
         p0.select(0).connect(p1)
 
     def test_connect_param_iterparam_no_select_raise_error(self):
-        p0 = Param("a", tp=List[torch.Tensor])
+        p0 = Param("a", tp=list[torch.Tensor])
         p1 = Param("b", value=torch.Tensor(2))
         # TODO: this check is temporary disabled because we should allow connect iterparam with iterparam
         # with pytest.raises(ValueError):
@@ -186,7 +186,7 @@ class TestParam:
         p1.connect(p0.select(0))
 
     def test_connect_param_iterparam_no_valid_type_raise_error(self):
-        p0 = Param("a", tp=List[torch.Tensor])
+        p0 = Param("a", tp=list[torch.Tensor])
         p1 = Param("b", value=2)
         with pytest.raises(TypeError):
             p1.connect(p0.select(0))
@@ -225,7 +225,7 @@ class TestParam:
         assert list(p1._refs[None]) == []
 
     def test_connect_disconnect_iterparam_param(self):
-        p0 = Param("a", tp=List[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
+        p0 = Param("a", tp=list[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
         p1 = Param("b")
         p0.select(1).connect(p1)
         assert isinstance(p1.container, Container)
@@ -236,7 +236,7 @@ class TestParam:
         assert list(p1._refs[None])[0] == Reference(p0, 1)
 
     def test_disconnect_iterparam_param(self):
-        p0 = Param("a", tp=List[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
+        p0 = Param("a", tp=list[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
         p1 = Param("b")
         p0.select(1).connect(p1)
         p0.select(1).disconnect(p1)
@@ -248,7 +248,7 @@ class TestParam:
         assert list(p1._refs[None]) == []
 
     def test_connect_param_iterparam(self):
-        p0 = Param("a", tp=List[torch.Tensor])
+        p0 = Param("a", tp=list[torch.Tensor])
         p1 = Param("b", value=torch.tensor(1))
         p2 = Param("c", value=torch.tensor(2))
         p1.connect(p0.select(1))
@@ -264,7 +264,7 @@ class TestParam:
         assert list(p2._refs[None])[0] == Reference(p0, 0)
 
     def test_disconnect_param_iterparam(self):
-        p0 = Param("a", tp=List[torch.Tensor])
+        p0 = Param("a", tp=list[torch.Tensor])
         p1 = Param("b", value=torch.tensor(1))
         p2 = Param("c", value=torch.tensor(2))
         p1.connect(p0.select(1))
@@ -282,8 +282,8 @@ class TestParam:
         assert list(p2._refs[None]) == []
 
     def test_connect_iterparam_iterparam(self):
-        p0 = Param("a", tp=List[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
-        p1 = Param("b", tp=List[torch.Tensor])
+        p0 = Param("a", tp=list[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
+        p1 = Param("b", tp=list[torch.Tensor])
         p0.select(0).connect(p1.select(1))
         p0.select(1).connect(p1.select(0))
         assert isinstance(p1.container, IterableInputContainers)
@@ -296,8 +296,8 @@ class TestParam:
         assert list(p1._refs[1])[0] == Reference(p0, 0)
 
     def test_disconnect_iterparam_iterparam(self):
-        p0 = Param("a", tp=List[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
-        p1 = Param("b", tp=List[torch.Tensor])
+        p0 = Param("a", tp=list[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
+        p1 = Param("b", tp=list[torch.Tensor])
         p0.select(0).connect(p1.select(1))
         p0.select(1).connect(p1.select(0))
         p0.select(0).disconnect(p1.select(1))
@@ -335,7 +335,7 @@ class TestParam:
         assert p2.ref_counter(None) == 1
 
     def test_ref_counter_iterable(self):
-        p0 = Param("a", List[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
+        p0 = Param("a", list[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
         p1 = Param("b")
         p2 = Param("c")
         p0.select(0).connect(p1)
@@ -350,7 +350,7 @@ class TestParam:
 @pytest.mark.usefixtures("event_loop_instance")
 class TestIterableParam:
     def test_smoke(self):
-        p = Param("a", tp=List[int], value=[1, 2])
+        p = Param("a", tp=list[int], value=[1, 2])
         ip = IterableParam(p, 0)
         assert ip.param is p
         assert ip.index == 0
@@ -360,7 +360,7 @@ class TestIterableParam:
         assert ip.iter_container.value == 1
 
     def test_ref_counter(self):
-        p0 = Param("a", tp=List[int], value=[1, 2])
+        p0 = Param("a", tp=list[int], value=[1, 2])
         ip = IterableParam(p0, 0)
         assert ip.ref_counter() == 0
         p1 = Param("b", tp=int)
@@ -372,13 +372,13 @@ def test_check_subscriptable():
     # only torch.Tensor is subscriptable
     assert not limbus.core.param._check_subscriptable(Sequence[int])
     assert not limbus.core.param._check_subscriptable(Iterable[int])
-    assert not limbus.core.param._check_subscriptable(List[int])
-    assert not limbus.core.param._check_subscriptable(Tuple[int])
+    assert not limbus.core.param._check_subscriptable(list[int])
+    assert not limbus.core.param._check_subscriptable(tuple[int])
     assert limbus.core.param._check_subscriptable(Sequence[torch.Tensor])
     assert limbus.core.param._check_subscriptable(Iterable[torch.Tensor])
-    assert limbus.core.param._check_subscriptable(List[torch.Tensor])
-    assert limbus.core.param._check_subscriptable(Tuple[torch.Tensor])
-    assert not limbus.core.param._check_subscriptable(Tuple[torch.Tensor, torch.Tensor])
+    assert limbus.core.param._check_subscriptable(list[torch.Tensor])
+    assert limbus.core.param._check_subscriptable(tuple[torch.Tensor])
+    assert not limbus.core.param._check_subscriptable(tuple[torch.Tensor, torch.Tensor])
     assert not limbus.core.param._check_subscriptable(int)
     assert not limbus.core.param._check_subscriptable(torch.Tensor)
     assert not limbus.core.param._check_subscriptable(str)
@@ -434,7 +434,7 @@ class TestInputParam:
     async def test_receive_from_iterable_param(self):
         po0 = OutputParam("b", torch.Tensor, parent=A("b"))
         po1 = OutputParam("c", torch.Tensor, parent=A("c"))
-        pi = InputParam("a", List[torch.Tensor], parent=A("a"))
+        pi = InputParam("a", list[torch.Tensor], parent=A("a"))
         po0 >> pi.select(0)
         po1 >> pi.select(1)
         t0 = asyncio.create_task(pi.receive())
@@ -490,7 +490,7 @@ class TestOutputParam:
         await asyncio.sleep(0)
 
     async def test_send_from_iterable_param(self):
-        po = OutputParam("c", List[torch.Tensor], parent=A("c"))
+        po = OutputParam("c", list[torch.Tensor], parent=A("c"))
         pi0 = InputParam("a", torch.Tensor, parent=A("a"))
         pi1 = InputParam("b", torch.Tensor, parent=A("b"))
         po.select(0) >> pi0

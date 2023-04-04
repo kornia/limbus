@@ -117,14 +117,12 @@ def _check_subscriptable(datatype: type) -> bool:
         bool: True if datatype is a subscriptable with tensors, False otherwise.
 
     """
-    if inspect.isclass(datatype):
-        return False
-
-    # in this case is a typing expresion
     # we need to know if it is a variable size datatype, we assume that all the sequences are variable size
     # if they contain tensors. E.g. list[Tensor], tuple[Tensor], Sequence[Tensor].
     # Note that e.g. for the case tuple[Tensor, Tensor] we don't assume it is variable since the size is known.
     origin = typing.get_origin(datatype)
+    if origin is None:  # discard datatypes that are not typing expressions
+        return False
     datatype_args: tuple = typing.get_args(datatype)
     if inspect.isclass(origin):
         is_abstract: bool = inspect.isabstract(origin)
