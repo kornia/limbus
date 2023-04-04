@@ -1,7 +1,7 @@
 """Component definition."""
 from __future__ import annotations
 from abc import abstractmethod
-from typing import List, Optional, TYPE_CHECKING, Callable, Type, Union, Any, Coroutine, Tuple
+from typing import TYPE_CHECKING, Callable, Type, Any, Coroutine
 import logging
 import asyncio
 import traceback
@@ -56,11 +56,11 @@ class _ComponentState():
     """
     def __init__(self, component: Component, state: ComponentState, verbose: bool = False):
         self._state: ComponentState = state
-        self._message: Optional[str] = None
+        self._message: None | str = None
         self._component: Component = component
         self._verbose: bool = verbose
 
-    def __call__(self, state: Optional[ComponentState] = None, msg: Optional[str] = None) -> ComponentState:
+    def __call__(self, state: None | ComponentState = None, msg: None | str = None) -> ComponentState:
         """Set the state of the component.
 
         If no args are passed, it returns the current state.
@@ -88,7 +88,7 @@ class _ComponentState():
                 log.info(f" {self._component.name}({self._component.counter}): {self._state.name} ({self._message})")
 
     @property
-    def message(self) -> Optional[str]:
+    def message(self) -> None | str:
         """Get the message associated to the state."""
         return self._message
 
@@ -125,9 +125,9 @@ class Component(base_class):
         self.__class__.register_outputs(self._outputs)
         self._properties = Params(self)
         self.__class__.register_properties(self._properties)
-        self._resume_event: Optional[asyncio.Event] = None
+        self._resume_event: None | asyncio.Event = None
         self._state: _ComponentState = _ComponentState(self, ComponentState.INITIALIZED)
-        self._pipeline: Optional[Pipeline] = None
+        self._pipeline: None | Pipeline = None
         self._exec_counter: int = 0  # Counter of executions.
         # Last execution to be run in the __call__ loop.
         self._stopping_iteration: int = 0  # 0 means run forever
@@ -164,11 +164,11 @@ class Component(base_class):
         return self._stopping_iteration
 
     @property
-    def state(self) -> Tuple[ComponentState, Optional[str]]:
+    def state(self) -> tuple[ComponentState, None | str]:
         """Get the current state of the component and its associated message."""
         return (self._state.state, self._state.message)
 
-    def set_state(self, state: ComponentState, msg: Optional[str] = None) -> None:
+    def set_state(self, state: ComponentState, msg: None | str = None) -> None:
         """Set the state of the component.
 
         Args:
@@ -259,7 +259,7 @@ class Component(base_class):
 
         """
         all_ok = True
-        properties: List[str] = self._properties.get_params()
+        properties: list[str] = self._properties.get_params()
         for key, value in kwargs.items():
             if key in properties:
                 self._properties.set_param(key, value)
@@ -269,11 +269,11 @@ class Component(base_class):
         return all_ok
 
     @property
-    def pipeline(self) -> Optional[Pipeline]:
+    def pipeline(self) -> None | Pipeline:
         """Get the pipeline object."""
         return self._pipeline
 
-    def set_pipeline(self, pipeline: Optional[Pipeline]) -> None:
+    def set_pipeline(self, pipeline: None | Pipeline) -> None:
         """Set the pipeline running the component."""
         self._pipeline = pipeline
 
