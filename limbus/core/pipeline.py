@@ -316,7 +316,7 @@ class Pipeline:
 
         await start()
 
-        # set the end state if there was not set before
+        # set the end state if there was not set before
         if self._state.state not in [PipelineState.FORCED_STOP, PipelineState.ERROR, PipelineState.EMPTY]:
             self._state(PipelineState.ENDED)
         if self.after_pipeline_user_hook is not None:

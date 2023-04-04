@@ -535,7 +535,7 @@ class InputParam(Param):
         else:
             self._parent.set_state(ComponentState.RUNNING)
             if self._parent.pipeline and self._parent.pipeline.before_component_user_hook:
-                    await self._parent.pipeline.before_component_user_hook(self._parent)
+                await self._parent.pipeline.before_component_user_hook(self._parent)
             return self.value
 
 
