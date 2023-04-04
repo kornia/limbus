@@ -1,17 +1,17 @@
 """Module to manage the visualization tools in limbus."""
-from typing import Optional, Type, Union
+from typing import Type
 import inspect
 
 from limbus.widgets import types
 
 
 # global var to store the visualization backend. We want a single instance.
-_viz: Optional[types.Viz] = None
+_viz: None | types.Viz = None
 # global var to store the type used for the visualization backend.
 _viz_cls: Type[types.Viz] = types.Console  # Default value is Console.
 
 
-def set_type(viz_cls: Union[Type[types.Viz], str]) -> None:
+def set_type(viz_cls: Type[types.Viz] | str) -> None:
     """Set the visualization class that will be used to create the visualization object.
 
     Args:

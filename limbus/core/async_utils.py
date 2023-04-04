@@ -2,7 +2,7 @@
 from __future__ import annotations
 import asyncio
 import inspect
-from typing import Coroutine, TYPE_CHECKING, Optional
+from typing import Coroutine, TYPE_CHECKING
 from sys import version_info
 
 if TYPE_CHECKING:
@@ -27,14 +27,14 @@ def run_coroutine(coro: Coroutine) -> None:
         asyncio.run(coro)
 
 
-def get_task_if_exists(component: Component) -> Optional[asyncio.Task]:
+def get_task_if_exists(component: Component) -> None | asyncio.Task:
     """Get the task associated to a given component if it exists.
 
     Args:
         component: component to check.
 
     Returns:
-        Optional[asyncio.Task]: task associated to the component if it exists, None otherwise.
+        None | asyncio.Task: task associated to the component if it exists, None otherwise.
 
     """
     task: asyncio.Task

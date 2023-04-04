@@ -1,5 +1,4 @@
 """High level template to create apps."""
-from typing import List
 from abc import abstractmethod
 
 from limbus.core import Pipeline, VerboseMode, Component
@@ -15,7 +14,7 @@ class App:
         self._pipeline.add_nodes(self._get_component_attrs())
         self._pipeline.set_verbose_mode(VerboseMode.DISABLED)
 
-    def _get_component_attrs(self) -> List[Component]:
+    def _get_component_attrs(self) -> list[Component]:
         """Get the component attribute by name."""
         return [getattr(self, attr) for attr in dir(self) if isinstance(getattr(self, attr), Component)]
 

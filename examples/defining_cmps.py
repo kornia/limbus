@@ -1,5 +1,5 @@
 """Basic example defining components and connecting them."""
-from typing import List, Any
+from typing import Any
 import asyncio
 
 # If you want to change the limbus config you need to do it before importing any limbus module!!!
@@ -104,10 +104,10 @@ class Acc(Component):
 
     @staticmethod
     def register_outputs(outputs: OutputParams) -> None:  # noqa: D102
-        outputs.declare("out", List[int])
+        outputs.declare("out", list[int])
 
     async def forward(self) -> ComponentState:  # noqa: D102
-        res: List[int] = []
+        res: list[int] = []
         while len(res) < self._elements:
             res.append(await self._inputs.inp.receive())
             print(f"Acc {len(res)}: {res}")
