@@ -1,4 +1,5 @@
 """High level template to create apps."""
+from __future__ import annotations
 from abc import abstractmethod
 
 from limbus.core import Pipeline, VerboseMode, Component

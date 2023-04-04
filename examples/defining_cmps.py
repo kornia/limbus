@@ -1,4 +1,5 @@
 """Basic example defining components and connecting them."""
+from __future__ import annotations
 from typing import Any
 import asyncio
 
