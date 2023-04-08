@@ -190,6 +190,9 @@ class Pipeline:
             component.set_state(ComponentState.PAUSED)
         await self._resume_event.wait()
         component.set_state(ComponentState.READY)
+        # update the iteration counter
+        # since each component can be running a different iteration we assign the max value
+        self._counter = max(self.counter, component.counter)
 
     async def after_component_hook(self, component: Component) -> None:
         """Run after the execution of each component.
@@ -204,8 +207,6 @@ class Pipeline:
             component.set_state(ComponentState.FORCED_STOP)
             return
         # when the number of iters to run is reached...
-        # since each component can be running a different iteration we assign the max value
-        self._counter = max(self.counter, component.counter)
         if self._min_number_of_iters_to_run != 0 and component.counter >= component.stopping_iteration:
             component.set_state(ComponentState.STOPPED_AT_ITER)
 
