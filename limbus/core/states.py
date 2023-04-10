@@ -36,6 +36,7 @@ class ComponentState(Enum):
     SENDING_PARAMS = 9
     STOPPED_AT_ITER = 10  # when the stop is because of the iteration number
     READY = 11  # when the component is ready to be executed at the beginning of each iteration
+    STOPPED_BY_COMPONENT = 12  # when the stop is because another component forces it
 
 
 class PipelineState(Enum):

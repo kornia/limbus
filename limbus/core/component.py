@@ -317,7 +317,8 @@ class Component(base_class):
     def is_stopped(self) -> bool:
         """Check if the component is stopped or is going to be stopped."""
         if self.state[0] in [ComponentState.STOPPED, ComponentState.STOPPED_AT_ITER,
-                             ComponentState.ERROR, ComponentState.FORCED_STOP]:
+                             ComponentState.ERROR, ComponentState.FORCED_STOP,
+                             ComponentState.STOPPED_BY_COMPONENT]:
             return True
         return False
 
