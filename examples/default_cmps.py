@@ -25,7 +25,7 @@ show = components.base.Printer("print")  # type: ignore
 c1.outputs.out >> stack.inputs.dim
 t1.outputs.out >> stack.inputs.tensors.select(0)
 t2.outputs.out >> stack.inputs.tensors.select(1)
-stack.outputs.tensor >> show.inputs.inp
+stack.outputs.out >> show.inputs.inp
 
 USING_PIPELINE = True
 if USING_PIPELINE:

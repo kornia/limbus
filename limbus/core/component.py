@@ -1,6 +1,7 @@
 """Component definition."""
 from __future__ import annotations
 from abc import abstractmethod
+from functools import partial
 from typing import TYPE_CHECKING, Callable, Type, Any, Coroutine
 import logging
 import asyncio
@@ -137,7 +138,7 @@ class Component(base_class):
         try:
             if nn.Module in Component.__mro__:
                 # If the component inherits from nn.Module, the forward method is called by the __call__ method
-                self._run_forward = nn.Module.__call__
+                self._run_forward = partial(nn.Module.__call__, self)
         except NameError:
             pass
 
