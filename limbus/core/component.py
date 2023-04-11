@@ -134,7 +134,7 @@ class Component(base_class):
                 self._run_forward = partial(nn.Module.__call__, self)
         except NameError:
             pass
-            
+
     def init_from_component(self, ref_component: Component) -> None:
         """Init basic execution params from another component.
 
