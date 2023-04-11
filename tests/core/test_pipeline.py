@@ -58,7 +58,7 @@ class TestPipeline:
         show0 = Printer("print0")
         c1.outputs.out.connect(unbind.inputs.input)
         c2.outputs.out.connect(unbind.inputs.dim)
-        unbind.outputs.tensors.select(0).connect(show0.inputs.inp)
+        unbind.outputs.out.select(0).connect(show0.inputs.inp)
         pipeline = Pipeline()
         pipeline.add_nodes([c1, c2, unbind, show0])
         out = pipeline.run(1)
