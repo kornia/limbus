@@ -1,6 +1,7 @@
 """Component definition."""
 from __future__ import annotations
 from abc import abstractmethod
+from functools import partial
 from typing import List, Optional, TYPE_CHECKING, Callable, Type, Union, Any, Coroutine
 import logging
 import asyncio
@@ -125,6 +126,15 @@ class Component(base_class):
         # Last execution to be run in the __call__ loop.
         self._stopping_iteration: int = 0  # 0 means run forever
 
+        # method called in _run_with_hooks to execute the component forward method
+        self._run_forward: Callable[..., Coroutine[Any, Any, ComponentState]] = self.forward
+        try:
+            if nn.Module in Component.__mro__:
+                # If the component inherits from nn.Module, the forward method is called by the __call__ method
+                self._run_forward = partial(nn.Module.__call__, self)
+        except NameError:
+            pass
+            
     def init_from_component(self, ref_component: Component) -> None:
         """Init basic execution params from another component.
 
@@ -326,7 +336,7 @@ class Component(base_class):
             if len(self._inputs) == 0:
                 # RUNNING state is set once the input params are received, if there are not inputs the state is set here
                 self.set_state(ComponentState.RUNNING)
-            self.set_state(await self.forward(*args, **kwargs))
+            self.set_state(await self._run_forward(*args, **kwargs))
         except ComponentStoppedError as e:
             self.set_state(e.state)
         except Exception as e:
