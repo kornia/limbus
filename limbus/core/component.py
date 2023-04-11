@@ -1,6 +1,7 @@
 """Component definition."""
 from __future__ import annotations
 from abc import abstractmethod
+from functools import partial
 from typing import List, Optional, TYPE_CHECKING, Callable, Type, Union, Any, Coroutine
 import logging
 import asyncio
@@ -127,9 +128,12 @@ class Component(base_class):
 
         # method called in _run_with_hooks to execute the component forward method
         self._run_forward: Callable[..., Coroutine[Any, Any, ComponentState]] = self.forward
-        if nn.Module in Component.__mro__:
-            # If the component inherits from nn.Module, the forward method is called by the __call__ method
-            self._run_forward = nn.Module.__call__
+        try:
+            if nn.Module in Component.__mro__:
+                # If the component inherits from nn.Module, the forward method is called by the __call__ method
+                self._run_forward = partial(nn.Module.__call__, self)
+        except NameError:
+            pass
 
     def init_from_component(self, ref_component: Component) -> None:
         """Init basic execution params from another component.

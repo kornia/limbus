@@ -30,7 +30,7 @@ class WebcamApp(App):
     def connect_components(self):  # noqa: D102
         self._webcam.outputs.image >> self._accum.inputs.inp
         self._accum.outputs.out >> self._cat.inputs.tensors
-        self._cat.outputs.tensor >> self._show.inputs.image
+        self._cat.outputs.out >> self._show.inputs.image
 
     def run(self, iters: int = 0):  # noqa: D102
         self._pipeline.set_verbose_mode(VerboseMode.PIPELINE)
