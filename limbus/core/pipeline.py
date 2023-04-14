@@ -72,7 +72,7 @@ class Pipeline:
         # user defined hooks
         self._before_component_user_hook: None | Callable = None
         self._after_component_user_hook: None | Callable = None
-        # self._before_iteration_user_hook: None | Callable = None
+        self._before_iteration_user_hook: None | Callable = None
         self._after_iteration_user_hook: None | Callable = None
         self._before_pipeline_user_hook: None | Callable = None
         self._after_pipeline_user_hook: None | Callable = None
@@ -108,29 +108,28 @@ class Pipeline:
         """Get the after pipeline user hook."""
         return self._after_pipeline_user_hook
 
-    # def set_before_iteration_user_hook(self, hook: None | Callable) -> None:
-    #     """Set a hook to be executed before each iteration.
+    def set_before_iteration_user_hook(self, hook: None | Callable) -> None:
+        """Set a hook to be executed before each iteration.
 
-    #     This callable must have a single parameter which is an int denoting the iter being executed.
-    #     Moreover it must be async.
+        This callable must have a single parameter which is an int denoting the iter being executed.
+        Moreover it must be async.
 
-    #     Prototype: async def hook_name(counter: int).
-    #     """
-    #     self._before_iteration_user_hook = hook
+        Prototype: async def hook_name(counter: int).
+        """
+        self._before_iteration_user_hook = hook
 
-    # @property
-    # def before_iteration_user_hook(self) -> None | Callable:
-    #     """Get the before iteration user hook."""
-    #     return self._before_iteration_user_hook
+    @property
+    def before_iteration_user_hook(self) -> None | Callable:
+        """Get the before iteration user hook."""
+        return self._before_iteration_user_hook
 
     def set_after_iteration_user_hook(self, hook: None | Callable) -> None:
         """Set a hook to be executed after each iteration (next iter can be already in execution).
 
-        This callable must have 2 parameters which are the state of the pipeline at the end of the iteration and
-        the iteration id that was finished.
+        This callable must have a single parameter which is the state of the pipeline at the end of the iteration.
         Moreover it must be async.
 
-        Prototype: async def hook_name(state: PipelineState, iter: int).
+        Prototype: async def hook_name(state: PipelineState).
         """
         self._after_iteration_user_hook = hook
 
@@ -216,6 +215,7 @@ class Pipeline:
             component: component to be executed.
 
         """
+        # just in case in the future several components run in parallel (not now)
         await self._pipeline_updates_from_component_lock.acquire()
         try:
             if not self._resume_event.is_set():
@@ -235,8 +235,6 @@ class Pipeline:
             if is_prev_iter_finished:
                 # previous iteration has finished but the current one started before or just now
                 self._min_iteration_in_progress += 1
-                # if self._before_iteration_user_hook is not None:
-                #    await self._before_iteration_user_hook(self._min_iteration_id_in_progress)
         finally:
             self._pipeline_updates_from_component_lock.release()
 
@@ -247,6 +245,7 @@ class Pipeline:
             component: executed component.
 
         """
+        # just in case in the future several components run in parallel (not now)
         await self._pipeline_updates_from_component_lock.acquire()
         try:
             # determine when the component must be stopped
@@ -258,16 +257,18 @@ class Pipeline:
             self._iteration_component_state[component] = (IterationState.COMPONENT_EXECUTED,
                                                           component.executions_counter)
 
+            # NEXT CODE is disabled because we cannot know when an iteration starts.
             # get the state of the iteration
-            is_prev_iter_finished, _ = self._get_iteration_status()
-
-            if is_prev_iter_finished:
-                if self._after_iteration_user_hook is not None:
+            # is_prev_iter_finished, _ = self._get_iteration_status()
+            # if is_prev_iter_finished:
+            #    if self._after_iteration_user_hook is not None:
                     # Since the last component being executed changes its state in this method the
                     # min iteration in progress is correct.
-                    await self._after_iteration_user_hook(self.state, self._min_iteration_in_progress)
+            #        await self._after_iteration_user_hook(self.state, self._min_iteration_in_progress)
 
             # when the number of iters to run is reached...
+            # NOTE: component could be stopped before finishing the number of iterations since execution != iteration.
+            # In that case the other components will force rerunning this one to run the required iterations.
             if self._min_number_of_iters_to_run != 0 and component.executions_counter >= component.stopping_execution:
                 component.set_state(ComponentState.STOPPED_AT_ITER)
         finally:
@@ -344,11 +345,6 @@ class Pipeline:
             PipelineState with the current pipeline status.
 
         """
-        # Number of times each component will be run at least.
-        # This feature should be mainly used for debugging purposes. It can make the processing a bit slower and
-        # depending on the graph to be executed it can require to recreate tasks (e.g. when a given component requires
-        # several runs from a previous one).
-        self._min_number_of_iters_to_run = iters
         self._iteration_component_state = {}
         self._stop_event.clear()
 
@@ -380,7 +376,34 @@ class Pipeline:
             # if it is empty we do not run the pipeline
             return self._state.state
 
-        await start()
+        # NOTE about limitting the number of iterations and using iteration hooks.
+        # In order to achieve both we need to block asyncio execution. The selected mechanism is using a loop in this
+        # method. This means that it is not efficient and this feature should be mainly used for debugging purposes.
+        # It can make the processing a bit slower and depending on the graph to be executed it can require to recreate
+        # tasks (e.g. when a given component requires several runs to finish one iteration).
+        # Even if you do not limit the number of iterations but you want to run the pipeline forever using
+        # iteration hooks then the iterations must be run independently to be able to know when each iteration starts
+        # and ends. NOTE that after_iteration_user_hook() could be run in after_component_hook() but without control on
+        # when the next iteration starts, so we disabled.
+        # ATTENTION: We recommend to use this feature only for debugging!!!
+        self._min_number_of_iters_to_run = 0
+        # if there are hooks then iters must be run one by one
+        if self._before_iteration_user_hook is not None or self._after_iteration_user_hook is not None:
+            self._min_number_of_iters_to_run = 1
+
+        # If there are no hooks but there is a limit in the number of iters we only set 1 iters but running all the
+        # required iters.
+        if self._min_number_of_iters_to_run == 0:
+            self._min_number_of_iters_to_run = iters
+            iters = 1
+
+        # run the pipeline as independent iterations. The loop is only run ince if there are no hooks.
+        for _ in range(iters):
+            if self._before_iteration_user_hook is not None:
+                await self._before_iteration_user_hook(self._min_iteration_in_progress)
+            await start()
+            if self._after_iteration_user_hook is not None:
+                await self._after_iteration_user_hook(self.state)
 
         # set the end state if there was not set before
         if self._state.state not in [PipelineState.FORCED_STOP, PipelineState.ERROR, PipelineState.EMPTY]:
