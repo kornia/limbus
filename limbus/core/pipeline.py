@@ -5,7 +5,7 @@ import logging
 import asyncio
 
 from limbus.core.component import Component, ComponentState
-from limbus.core.states import PipelineState, VerboseMode
+from limbus.core.states import PipelineState, VerboseMode, IterationState
 from limbus.core import async_utils
 
 logging.basicConfig(level=logging.INFO)
@@ -60,7 +60,10 @@ class Pipeline:
         self._resume_event: asyncio.Event = asyncio.Event()
         self._stop_event: asyncio.Event = asyncio.Event()
         self._state: _PipelineState = _PipelineState(PipelineState.INITIALIZING)
-        self._counter: int = 0  # number of iterations executed in the pipeline (== component with more executions).
+        # flag x component denoting if it was run in the iteration
+        self._iteration_component_state: dict[Component, tuple[IterationState, int]] = {}
+        # number of iterations executed in the pipeline (== component with less executions).
+        self._min_iteration_in_progress: int = 0
         # Number of times each component will be run at least.
         # This feature should be mainly used for debugging purposes. It can make the processing a bit slower and
         # depending on the graph to be executed it can require to recreate tasks (e.g. when a given component requires
@@ -286,6 +289,7 @@ class Pipeline:
         # depending on the graph to be executed it can require to recreate tasks (e.g. when a given component requires
         # several runs from a previous one).
         self._min_number_of_iters_to_run = iters
+        self._iteration_component_state = {}
         self._stop_event.clear()
 
         async def start() -> None:
@@ -293,6 +297,7 @@ class Pipeline:
             for node in self._nodes:
                 node.set_pipeline(self)
                 tasks.append(node())
+                self._iteration_component_state[node] = (IterationState.COMPONENT_NOT_EXECUTED, 0)
             self.resume()
             await asyncio.gather(*tasks)
             # check if there are pending tasks

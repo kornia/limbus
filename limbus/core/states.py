@@ -49,3 +49,10 @@ class PipelineState(Enum):
     RUNNING = 5
     INITIALIZING = 6
     FORCED_STOP = 7
+
+
+class IterationState(Enum):
+    """Internal state to control the pipeline iterations."""
+    COMPONENT_EXECUTED = 0
+    COMPONENT_NOT_EXECUTED = 1
+    COMPONENT_IN_EXECUTION = 2
