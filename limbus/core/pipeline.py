@@ -252,7 +252,6 @@ class Pipeline:
             # when the pipeline claims that it must be stopped...
             if self._stop_event.is_set():
                 component.set_state(ComponentState.FORCED_STOP)
-                return
             # denote that this component was already executed in the current iteration
             self._iteration_component_state[component] = (IterationState.COMPONENT_EXECUTED,
                                                           component.executions_counter)
@@ -269,7 +268,9 @@ class Pipeline:
             # when the number of iters to run is reached...
             # NOTE: component could be stopped before finishing the number of iterations since execution != iteration.
             # In that case the other components will force rerunning this one to run the required iterations.
-            if self._min_number_of_iters_to_run != 0 and component.executions_counter >= component.stopping_execution:
+            if (not component.is_stopped() and
+                    self._min_number_of_iters_to_run != 0 and
+                    component.executions_counter >= component.stopping_execution):
                 component.set_state(ComponentState.STOPPED_AT_ITER)
         finally:
             self._pipeline_updates_from_component_lock.release()
@@ -407,9 +408,13 @@ class Pipeline:
             if self._after_iteration_user_hook is not None:
                 await self._after_iteration_user_hook(self.state)
 
-            # set the end state if there was not set before
-            if self._state.state not in [PipelineState.FORCED_STOP, PipelineState.ERROR, PipelineState.EMPTY]:
+            states = [component.state[0] for component in self._nodes]
+            if ComponentState.STOPPED in states:
                 self._state(PipelineState.ENDED)
+            elif ComponentState.ERROR in states:
+                self._state(PipelineState.ERROR)
+
+            if self._state.state in [PipelineState.FORCED_STOP, PipelineState.ERROR, PipelineState.ENDED]:
                 break
 
         if self.after_pipeline_user_hook is not None:

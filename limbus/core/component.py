@@ -352,7 +352,7 @@ class Component(base_class):
         self.__exec_counter += 1
         if self.__pipeline is not None:
             await self.__pipeline.before_component_hook(self)
-            if self._stop_if_needed():
+            if self._stop_if_needed():  # just in case the component state is changed in the before_component_hook
                 return True
         # run the component
         try:
