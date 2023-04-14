@@ -262,8 +262,8 @@ class Pipeline:
             # is_prev_iter_finished, _ = self._get_iteration_status()
             # if is_prev_iter_finished:
             #    if self._after_iteration_user_hook is not None:
-                    # Since the last component being executed changes its state in this method the
-                    # min iteration in progress is correct.
+            #        # Since the last component being executed changes its state in this method the
+            #        # min iteration in progress is correct.
             #        await self._after_iteration_user_hook(self.state, self._min_iteration_in_progress)
 
             # when the number of iters to run is reached...
@@ -387,7 +387,7 @@ class Pipeline:
         # when the next iteration starts, so we disabled.
         # ATTENTION: We recommend to use this feature only for debugging!!!
         self._min_number_of_iters_to_run = 0
-        # if there are hooks then iters must be run one by one
+        # if there are hooks then iters must be run one by one forever
         if self._before_iteration_user_hook is not None or self._after_iteration_user_hook is not None:
             self._min_number_of_iters_to_run = 1
 
@@ -398,16 +398,20 @@ class Pipeline:
             iters = 1
 
         # run the pipeline as independent iterations. The loop is only run ince if there are no hooks.
-        for _ in range(iters):
+        forever = iters == 0
+        while forever or iters > 0:  # run until the pipeline is completed or there are no iters to run
+            iters -= 1 if not forever else 0
             if self._before_iteration_user_hook is not None:
                 await self._before_iteration_user_hook(self._min_iteration_in_progress)
             await start()
             if self._after_iteration_user_hook is not None:
                 await self._after_iteration_user_hook(self.state)
 
-        # set the end state if there was not set before
-        if self._state.state not in [PipelineState.FORCED_STOP, PipelineState.ERROR, PipelineState.EMPTY]:
-            self._state(PipelineState.ENDED)
+            # set the end state if there was not set before
+            if self._state.state not in [PipelineState.FORCED_STOP, PipelineState.ERROR, PipelineState.EMPTY]:
+                self._state(PipelineState.ENDED)
+                break
+
         if self.after_pipeline_user_hook is not None:
             await self.after_pipeline_user_hook(self.state)
         return self._state.state
