@@ -392,7 +392,7 @@ class A(Component):
 class B(Component):
     def __init__(self, name):
         super().__init__(name)
-        self.__stopping_execution = 1
+        self.stopping_execution = 1
 
     async def forward(self) -> ComponentState:
         return ComponentState.OK
