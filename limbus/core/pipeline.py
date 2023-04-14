@@ -176,7 +176,7 @@ class Pipeline:
 
         """
         if self._min_number_of_iters_to_run > 0:
-            return component.counter + self._min_number_of_iters_to_run
+            return component.executions_counter + self._min_number_of_iters_to_run
         return 0
 
     async def before_component_hook(self, component: Component) -> None:
@@ -211,9 +211,9 @@ class Pipeline:
             component.set_state(ComponentState.STOPPED_AT_ITER)
 
     @property
-    def counter(self) -> int:
-        """Get the number of started pipeline iterations."""
-        return self._counter
+    def min_iteration_in_progress(self) -> int:
+        """Get the number of the oldest iteration still being executed."""
+        return self._min_iteration_in_progress
 
     @property
     def state(self) -> PipelineState:

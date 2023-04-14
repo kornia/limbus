@@ -36,12 +36,12 @@ else:
 
 
 # this is a decorator that will determine how many iterations must be run
-def iterations_manager(func: Callable) -> Callable:
-    """Update the last iteration to be run by the component."""
+def executions_manager(func: Callable) -> Callable:
+    """Update the last execution to be run by the component."""
     @functools.wraps(func)
     async def wrapper_set_iteration(self, *args, **kwargs):
-        if self._pipeline is not None:
-            self._stopping_iteration = self._pipeline.get_component_stopping_iteration(self)
+        if self.pipeline is not None:
+            self.stopping_execution = self.pipeline.get_component_stopping_iteration(self)
         return await func(self, *args, **kwargs)
     return wrapper_set_iteration
 
@@ -84,9 +84,10 @@ class _ComponentState():
         """Log the message with the component name, iteration number and state."""
         if self._verbose:
             if self._message is None:
-                log.info(f" {self._component.name}({self._component.counter}): {self._state.name}")
+                log.info(f" {self._component.name}({self._component.executions_counter}): {self._state.name}")
             else:
-                log.info(f" {self._component.name}({self._component.counter}): {self._state.name} ({self._message})")
+                log.info(f" {self._component.name}({self._component.executions_counter}): {self._state.name}"
+                         f" ({self._message})")
 
     @property
     def message(self) -> None | str:
@@ -126,19 +127,18 @@ class Component(base_class):
         self.__class__.register_outputs(self._outputs)
         self._properties = Params(self)
         self.__class__.register_properties(self._properties)
-        self._resume_event: None | asyncio.Event = None
-        self._state: _ComponentState = _ComponentState(self, ComponentState.INITIALIZED)
-        self._pipeline: None | Pipeline = None
-        self._exec_counter: int = 0  # Counter of executions.
+        self.__state: _ComponentState = _ComponentState(self, ComponentState.INITIALIZED)
+        self.__pipeline: None | Pipeline = None
+        self.__exec_counter: int = 0  # Counter of executions.
         # Last execution to be run in the __call__ loop.
-        self._stopping_iteration: int = 0  # 0 means run forever
+        self.__stopping_execution: int = 0  # 0 means run forever
 
         # method called in _run_with_hooks to execute the component forward method
-        self._run_forward: Callable[..., Coroutine[Any, Any, ComponentState]] = self.forward
+        self.__run_forward: Callable[..., Coroutine[Any, Any, ComponentState]] = self.forward
         try:
             if nn.Module in Component.__mro__:
                 # If the component inherits from nn.Module, the forward method is called by the __call__ method
-                self._run_forward = partial(nn.Module.__call__, self)
+                self.__run_forward = partial(nn.Module.__call__, self)
         except NameError:
             pass
 
@@ -149,25 +149,38 @@ class Component(base_class):
             ref_component: reference component.
 
         """
-        self._pipeline = ref_component._pipeline
-        if self._pipeline is not None:
-            self._pipeline.add_nodes(self)
+        self.__pipeline = ref_component.__pipeline
+        if self.__pipeline is not None:
+            self.__pipeline.add_nodes(self)
         self.verbose = ref_component.verbose
 
     @property
-    def counter(self) -> int:
+    def executions_counter(self) -> int:
         """Get the executions counter."""
-        return self._exec_counter
+        return self.__exec_counter
 
     @property
-    def stopping_iteration(self) -> int:
-        """Get the last iteration to be run by the component in the __call__ loop."""
-        return self._stopping_iteration
+    def stopping_execution(self) -> int:
+        """Get the last execution to be run by the component in the __call__ loop.
+
+        Note that extra executions can be forced by other components to be able to run their executions.
+
+        """
+        return self.__stopping_execution
+
+    @stopping_execution.setter
+    def stopping_execution(self, value: int) -> None:
+        """Set the last execution to be run by the component in the __call__ loop.
+
+        Note that extra executions can be forced by other components to be able to run their executions.
+
+        """
+        self.__stopping_execution = value
 
     @property
     def state(self) -> tuple[ComponentState, None | str]:
         """Get the current state of the component and its associated message."""
-        return (self._state.state, self._state.message)
+        return (self.__state.state, self.__state.message)
 
     def set_state(self, state: ComponentState, msg: None | str = None) -> None:
         """Set the state of the component.
@@ -177,17 +190,17 @@ class Component(base_class):
             msg (optional): message to log.
 
         """
-        self._state(state, msg)
+        self.__state(state, msg)
 
     @property
     def verbose(self) -> bool:
         """Get the verbose state."""
-        return self._state.verbose
+        return self.__state.verbose
 
     @verbose.setter
     def verbose(self, value: bool) -> None:
         """Set the verbose state."""
-        self._state.verbose = value
+        self.__state.verbose = value
 
     @property
     def name(self) -> str:
@@ -272,11 +285,11 @@ class Component(base_class):
     @property
     def pipeline(self) -> None | Pipeline:
         """Get the pipeline object."""
-        return self._pipeline
+        return self.__pipeline
 
     def set_pipeline(self, pipeline: None | Pipeline) -> None:
         """Set the pipeline running the component."""
-        self._pipeline = pipeline
+        self.__pipeline = pipeline
 
     def _stop_component(self) -> None:
         """Prepare the component to be stopped."""
@@ -295,20 +308,22 @@ class Component(base_class):
                 ref.sent.set()
                 ref.consumed.set()
 
-    @iterations_manager
+    @executions_manager
     async def __call__(self) -> None:
         """Execute the forward method.
 
         If the component is executed in a pipeline, the component runs forever. However,
         if the component is run alone it will run only once.
 
-        NOTE: If you want to use `async for...` instead of `while True` this method must be overridden.
+        NOTE 1: If you want to use `async for...` instead of `while True` this method must be overridden.
         E.g.:
             async for x in xyz:
                 if await self._run_with_hooks(x):
                     break
 
             Note that in this example the forward method will require 1 parameter.
+
+        NOTE 2: if you override this method you must add the `executions_manager` decorator.
 
         """
         while True:
@@ -334,30 +349,30 @@ class Component(base_class):
         return False
 
     async def _run_with_hooks(self, *args, **kwargs) -> bool:
-        self._exec_counter += 1
-        if self._pipeline is not None:
-            await self._pipeline.before_component_hook(self)
+        self.__exec_counter += 1
+        if self.__pipeline is not None:
+            await self.__pipeline.before_component_hook(self)
             if self._stop_if_needed():
                 return True
         # run the component
         try:
             if len(self._inputs) == 0:
                 # RUNNING state is set once the input params are received, if there are not inputs the state is set here
-                if self._pipeline is not None and self._pipeline.before_component_user_hook:
-                    await self._pipeline.before_component_user_hook(self)
+                if self.__pipeline is not None and self.__pipeline.before_component_user_hook:
+                    await self.__pipeline.before_component_user_hook(self)
                 self.set_state(ComponentState.RUNNING)
-            self.set_state(await self._run_forward(*args, **kwargs))
+            self.set_state(await self.__run_forward(*args, **kwargs))
         except ComponentStoppedError as e:
             self.set_state(e.state)
         except Exception as e:
             self.set_state(ComponentState.ERROR, f"{type(e).__name__} - {str(e)}")
             log.error(f"Error in component {self.name}.\n"
                       f"{''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        if self._pipeline is not None:
+        if self.__pipeline is not None:
             # after component hook
-            await self._pipeline.after_component_hook(self)
-            if self._pipeline.after_component_user_hook:
-                await self._pipeline.after_component_user_hook(self)
+            await self.__pipeline.after_component_hook(self)
+            if self.__pipeline.after_component_user_hook:
+                await self.__pipeline.after_component_user_hook(self)
             if self._stop_if_needed():
                 return True
             return False
@@ -368,36 +383,3 @@ class Component(base_class):
     async def forward(self, *args, **kwargs) -> ComponentState:
         """Run the component, this method shouldn't be called, instead call __call__."""
         raise NotImplementedError
-
-    def finish_iter(self) -> None:
-        """Event executed when each pipeline iter finishes.
-
-        Note that this method can be defined as async if needed.
-
-        """
-        pass
-
-    def finish_pipeline(self) -> None:
-        """Event executed when the pipeline finishes.
-
-        Note that this method can be defined as async if needed.
-
-        """
-        pass
-
-    def init_iter(self) -> None:
-        """Event executed when each pipeline iter starts.
-
-        Note that this method can be defined as async if needed.
-
-        """
-        pass
-
-    def init_pipeline(self) -> None:
-        """Event executed when the pipeline starts.
-
-        Note that this method can be defined as async if needed.
-        For example this method is useful to init some await variables that cannot be initialized in the constructor.
-
-        """
-        pass

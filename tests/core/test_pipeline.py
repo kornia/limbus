@@ -72,7 +72,7 @@ class TestPipeline:
         pipeline.add_nodes([c1, show0])
         out = pipeline.run(2)
         assert isinstance(out, PipelineState)
-        assert pipeline.counter == 2
+        assert pipeline.min_iteration_in_progress == 2
 
     async def test_pipeline_flow(self):
         c1 = Constant("c1", torch.rand(2, 3))
@@ -115,8 +115,8 @@ class TestPipeline:
             assert c1.state[0] == ComponentState.FORCED_STOP
             assert show0.state[0] == ComponentState.FORCED_STOP
         await task()
-        assert pipeline.counter > 0
-        assert pipeline.counter < 5
+        assert pipeline.min_iteration_in_progress > 0
+        assert pipeline.min_iteration_in_progress < 5
 
     def test_pipeline_verbose(self):
         c1 = Constant("c1", torch.rand(2, 3))

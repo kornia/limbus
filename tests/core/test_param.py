@@ -392,7 +392,7 @@ class A(Component):
 class B(Component):
     def __init__(self, name):
         super().__init__(name)
-        self._stopping_iteration = 1
+        self.__stopping_execution = 1
 
     async def forward(self) -> ComponentState:
         return ComponentState.OK
@@ -429,7 +429,7 @@ class TestInputParam:
         assert res == [None, 1]
         assert [ref.consumed.is_set() for ref in pi.references] == [True]
         assert [ref.sent.is_set() for ref in po.references] == [False]
-        assert pi.parent.counter == 1
+        assert pi.parent.executions_counter == 1
 
     async def test_receive_from_iterable_param(self):
         po0 = OutputParam("b", torch.Tensor, parent=A("b"))

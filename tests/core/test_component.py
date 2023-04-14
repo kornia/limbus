@@ -155,9 +155,9 @@ class TestComponentWithPipeline:
         pipeline = Pipeline()
         pipeline.add_nodes(cmp)
         pipeline.run(iters)
-        assert cmp.counter == 1
-        assert pipeline.counter == 1
-        assert cmp.stopping_iteration == iters
+        assert cmp.executions_counter == 1
+        assert pipeline.min_iteration_in_progress == 1
+        assert cmp.stopping_execution == iters
 
     def test_stop_after_exception(self):
         class A(Component):
@@ -168,8 +168,8 @@ class TestComponentWithPipeline:
         pipeline = Pipeline()
         pipeline.add_nodes(cmp)
         pipeline.run(2)
-        assert cmp.counter == 1
-        assert pipeline.counter == 1
+        assert cmp.executions_counter == 1
+        assert pipeline.min_iteration_in_progress == 1
         assert cmp.state[0] == ComponentState.ERROR
 
     def test_stop_after_stop(self):
@@ -181,6 +181,6 @@ class TestComponentWithPipeline:
         pipeline = Pipeline()
         pipeline.add_nodes(cmp)
         pipeline.run(2)
-        assert cmp.counter == 1
-        assert pipeline.counter == 1
+        assert cmp.executions_counter == 1
+        assert pipeline.min_iteration_in_progress == 1
         assert cmp.state[0] == ComponentState.STOPPED

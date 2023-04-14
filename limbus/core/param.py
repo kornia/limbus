@@ -487,7 +487,7 @@ class InputParam(Param):
                                        f"{ori_param.parent.name}.{ori_param.name} -> {self._parent.name}.{self.name}")
                 async_utils.create_task_if_needed(self._parent, ori_param.parent)
 
-            if self._parent.stopping_iteration == 0:
+            if self._parent.stopping_execution == 0:
                 # fast way, in contrast with the while loop below, to wait for the input param.
                 # wait until all the output params send the values
                 await asyncio.gather(*[ref.sent.wait() for ref in self.references if ref.sent is not None])
