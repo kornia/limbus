@@ -72,10 +72,11 @@ class Pipeline:
         # user defined hooks
         self._before_component_user_hook: None | Callable = None
         self._after_component_user_hook: None | Callable = None
-        self._before_iteration_user_hook: None | Callable = None
+        # self._before_iteration_user_hook: None | Callable = None
         self._after_iteration_user_hook: None | Callable = None
         self._before_pipeline_user_hook: None | Callable = None
         self._after_pipeline_user_hook: None | Callable = None
+        self._pipeline_updates_from_component_lock = asyncio.Lock()
 
     def set_before_pipeline_user_hook(self, hook: None | Callable) -> None:
         """Set a hook to be executed before the pipeline execution.
@@ -107,28 +108,29 @@ class Pipeline:
         """Get the after pipeline user hook."""
         return self._after_pipeline_user_hook
 
-    def set_before_iteration_user_hook(self, hook: None | Callable) -> None:
-        """Set a hook to be executed before each iteration.
+    # def set_before_iteration_user_hook(self, hook: None | Callable) -> None:
+    #     """Set a hook to be executed before each iteration.
 
-        This callable must have a single parameter which is an int denoting the iter being executed.
-        Moreover it must be async.
+    #     This callable must have a single parameter which is an int denoting the iter being executed.
+    #     Moreover it must be async.
 
-        Prototype: async def hook_name(counter: int).
-        """
-        self._before_iteration_user_hook = hook
+    #     Prototype: async def hook_name(counter: int).
+    #     """
+    #     self._before_iteration_user_hook = hook
 
-    @property
-    def before_iteration_user_hook(self) -> None | Callable:
-        """Get the before iteration user hook."""
-        return self._before_iteration_user_hook
+    # @property
+    # def before_iteration_user_hook(self) -> None | Callable:
+    #     """Get the before iteration user hook."""
+    #     return self._before_iteration_user_hook
 
     def set_after_iteration_user_hook(self, hook: None | Callable) -> None:
-        """Set a hook to be executed after each iteration.
+        """Set a hook to be executed after each iteration (next iter can be already in execution).
 
-        This callable must have a single parameter which is the state of the pipeline at the end of the iteration.
+        This callable must have 2 parameters which are the state of the pipeline at the end of the iteration and
+        the iteration id that was finished.
         Moreover it must be async.
 
-        Prototype: async def hook_name(state: PipelineState).
+        Prototype: async def hook_name(state: PipelineState, iter: int).
         """
         self._after_iteration_user_hook = hook
 
@@ -182,6 +184,31 @@ class Pipeline:
             return component.executions_counter + self._min_number_of_iters_to_run
         return 0
 
+    def _get_iteration_status(self) -> tuple[bool, bool | None]:
+        """Get the status of the iteration.
+
+        Returns:
+            bool: True if all the components have finished the current iteration.
+            bool | None: True if the next iteration has started. None if it is undertemined.
+                Next iter status cannot be determined until the previous iter is finished.
+
+        """
+        values = list(self._iteration_component_state.values())
+        # get the state of the iteration
+        prev_iteration_status = [
+            # this cond is not always correct x component but it is correct for the pipeline.
+            # state[1] can be > self._min_iteration_in_progress but remaining in the same iter however the min
+            # exec_counter of all the components will be equal to the pipeline iter.
+            # NOTE: this will not be true once we allow adding components to the pipeline during the execution.
+            (state[0] == IterationState.COMPONENT_EXECUTED or state[1] > self._min_iteration_in_progress
+             ) for state in values
+        ]
+        prev_status = sum(prev_iteration_status) == len(prev_iteration_status)
+        if prev_status:
+            next_iteration_status = [state[0] == IterationState.COMPONENT_IN_EXECUTION for state in values]
+            return prev_status, sum(next_iteration_status) > 0
+        return prev_status, None
+
     async def before_component_hook(self, component: Component) -> None:
         """Run before the execution of each component.
 
@@ -189,13 +216,29 @@ class Pipeline:
             component: component to be executed.
 
         """
-        if not self._resume_event.is_set():
-            component.set_state(ComponentState.PAUSED)
-        await self._resume_event.wait()
-        component.set_state(ComponentState.READY)
-        # update the iteration counter
-        # since each component can be running a different iteration we assign the max value
-        self._counter = max(self.counter, component.counter)
+        await self._pipeline_updates_from_component_lock.acquire()
+        try:
+            if not self._resume_event.is_set():
+                component.set_state(ComponentState.PAUSED)
+            await self._resume_event.wait()
+            component.set_state(ComponentState.READY)
+            # state of the iteration
+            is_prev_iter_finished, _ = self._get_iteration_status()
+
+            # denote that this component is being executed in the current iteration
+            self._iteration_component_state[component] = (IterationState.COMPONENT_IN_EXECUTION,
+                                                          component.executions_counter)
+            if self._min_iteration_in_progress == 0:
+                # denote that the first iteration is starting
+                self._min_iteration_in_progress = 1
+
+            if is_prev_iter_finished:
+                # previous iteration has finished but the current one started before or just now
+                self._min_iteration_in_progress += 1
+                # if self._before_iteration_user_hook is not None:
+                #    await self._before_iteration_user_hook(self._min_iteration_id_in_progress)
+        finally:
+            self._pipeline_updates_from_component_lock.release()
 
     async def after_component_hook(self, component: Component) -> None:
         """Run after the execution of each component.
@@ -204,14 +247,31 @@ class Pipeline:
             component: executed component.
 
         """
-        # determine when the component must be stopped
-        # when the pipeline claims that it must be stopped...
-        if self._stop_event.is_set():
-            component.set_state(ComponentState.FORCED_STOP)
-            return
-        # when the number of iters to run is reached...
-        if self._min_number_of_iters_to_run != 0 and component.counter >= component.stopping_iteration:
-            component.set_state(ComponentState.STOPPED_AT_ITER)
+        await self._pipeline_updates_from_component_lock.acquire()
+        try:
+            # determine when the component must be stopped
+            # when the pipeline claims that it must be stopped...
+            if self._stop_event.is_set():
+                component.set_state(ComponentState.FORCED_STOP)
+                return
+            # denote that this component was already executed in the current iteration
+            self._iteration_component_state[component] = (IterationState.COMPONENT_EXECUTED,
+                                                          component.executions_counter)
+
+            # get the state of the iteration
+            is_prev_iter_finished, _ = self._get_iteration_status()
+
+            if is_prev_iter_finished:
+                if self._after_iteration_user_hook is not None:
+                    # Since the last component being executed changes its state in this method the
+                    # min iteration in progress is correct.
+                    await self._after_iteration_user_hook(self.state, self._min_iteration_in_progress)
+
+            # when the number of iters to run is reached...
+            if self._min_number_of_iters_to_run != 0 and component.executions_counter >= component.stopping_execution:
+                component.set_state(ComponentState.STOPPED_AT_ITER)
+        finally:
+            self._pipeline_updates_from_component_lock.release()
 
     @property
     def min_iteration_in_progress(self) -> int:
