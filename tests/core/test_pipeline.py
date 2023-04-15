@@ -112,8 +112,12 @@ class TestPipeline:
             assert pipeline._stop_event.is_set() is True
             assert pipeline.state == PipelineState.FORCED_STOP
             await asyncio.gather(t)
-            assert c1.state[0] == ComponentState.FORCED_STOP
-            assert show0.state[0] == ComponentState.FORCED_STOP
+            assert ComponentState.FORCED_STOP in c1.state
+            # Could be 3 states if ComponentState.STOPPED_BY_COMPONENT is in the states list. Denoting that another
+            # component stopped it.
+            assert len(c1.state_message) in [2, 3]
+            assert ComponentState.FORCED_STOP in show0.state
+            assert len(show0.state_message) in [2, 3]
         await task()
         assert pipeline.min_iteration_in_progress > 0
         assert pipeline.min_iteration_in_progress < 5

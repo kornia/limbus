@@ -251,7 +251,7 @@ class Pipeline:
             # determine when the component must be stopped
             # when the pipeline claims that it must be stopped...
             if self._stop_event.is_set():
-                component.set_state(ComponentState.FORCED_STOP)
+                component.set_state(ComponentState.FORCED_STOP, add=True)
             # denote that this component was already executed in the current iteration
             self._iteration_component_state[component] = (IterationState.COMPONENT_EXECUTED,
                                                           component.executions_counter)
@@ -271,7 +271,7 @@ class Pipeline:
             if (not component.is_stopped() and
                     self._min_number_of_iters_to_run != 0 and
                     component.executions_counter >= component.stopping_execution):
-                component.set_state(ComponentState.STOPPED_AT_ITER)
+                component.set_state(ComponentState.STOPPED_AT_ITER, add=True)
         finally:
             self._pipeline_updates_from_component_lock.release()
 
@@ -408,7 +408,9 @@ class Pipeline:
             if self._after_iteration_user_hook is not None:
                 await self._after_iteration_user_hook(self.state)
 
-            states = [component.state[0] for component in self._nodes]
+            states = []
+            for component in self._nodes:
+                states.extend(component.state)
             if ComponentState.STOPPED in states:
                 self._state(PipelineState.ENDED)
             elif ComponentState.ERROR in states:

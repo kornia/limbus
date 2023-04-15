@@ -9,14 +9,17 @@ class TestState:
     def test_smoke(self):
         cmp = Component("test")
         state = _ComponentState(cmp, ComponentState.RUNNING, True)
-        assert state.state == ComponentState.RUNNING
+        assert state.state == [ComponentState.RUNNING]
+        assert state.message == [None]
         assert state.verbose is True
         assert state._component == cmp
 
     def test_call_no_params(self):
         cmp = Component("test")
         state = _ComponentState(cmp, ComponentState.RUNNING)
-        assert state() == ComponentState.RUNNING
+        assert state() == [ComponentState.RUNNING]
+        assert state.message == [None]
+        assert state.verbose is False
 
     @pytest.mark.parametrize("verbose", [True, False])
     def test_call(self, caplog, verbose):
@@ -25,7 +28,8 @@ class TestState:
         state.verbose = verbose
         assert state.verbose == verbose
         with caplog.at_level(logging.INFO):
-            assert state(ComponentState.DISABLED, "message") == ComponentState.DISABLED
+            assert state(ComponentState.DISABLED, "message") == [ComponentState.DISABLED]
+            assert state.message == ["message"]
             if verbose:
                 assert len(caplog.records) == 1
                 assert "message" in caplog.text
@@ -170,7 +174,8 @@ class TestComponentWithPipeline:
         pipeline.run(2)
         assert cmp.executions_counter == 1
         assert pipeline.min_iteration_in_progress == 1
-        assert cmp.state[0] == ComponentState.ERROR
+        assert cmp.state == [ComponentState.ERROR]
+        assert cmp.state_message == ['Exception - test']
 
     def test_stop_after_stop(self):
         class A(Component):
@@ -183,4 +188,5 @@ class TestComponentWithPipeline:
         pipeline.run(2)
         assert cmp.executions_counter == 1
         assert pipeline.min_iteration_in_progress == 1
-        assert cmp.state[0] == ComponentState.STOPPED
+        assert cmp.state == [ComponentState.STOPPED]
+        assert cmp.state_message == [None]
