@@ -64,7 +64,7 @@ class _ComponentState():
     """
     def __init__(self, component: Component, state: ComponentState, verbose: bool = False):
         self._states: list[ComponentState] = [state]
-        self._messages: list[None | str] = [None]
+        self._messages: dict[ComponentState, None | str] = {state: None}
         self._component: Component = component
         self._verbose: bool = verbose
 
@@ -86,19 +86,19 @@ class _ComponentState():
         if state is not None:
             if add:
                 self._states.append(state)
-                self._messages.append(msg)
+                self._messages[state] = msg
             else:
                 self._states = [state]
-                self._messages = [msg]
+                self._messages = {state: msg}
             self._logger()
         return self._states
 
     def _logger(self) -> None:
         """Log the message with the component name, iteration number and state."""
         if self._verbose:
-            assert len(self._states) == len(self._messages)
             num_states = len(self._states)
-            for idx, (state, msg) in enumerate(zip(self._states, self._messages)):
+            for idx, state in enumerate(self._states):
+                msg = self._messages.get(state, None)
                 msg_str: str = f""
                 if num_states > 1:
                     msg_str = f" {idx + 1}/{num_states}"
@@ -108,10 +108,9 @@ class _ComponentState():
                     msg_str = f"{msg_str} ({msg})"
                 log.info(msg_str)
 
-    @property
-    def message(self) -> list[None | str]:
-        """Get the message associated to the state."""
-        return self._messages
+    def message(self, state: ComponentState) -> None | str:
+        """Get the message associated to the state. If state is not found, returns None."""
+        return self._messages.get(state, None)
 
     @property
     def state(self) -> list[ComponentState]:
@@ -201,10 +200,9 @@ class Component(base_class):
         """Get the current state/s of the component."""
         return self.__state.state
 
-    @property
-    def state_message(self) -> list[None | str]:
-        """Get the messages associated to the current state/s of the component."""
-        return self.__state.message
+    def state_message(self, state: ComponentState) -> None | str:
+        """Get the message associated a given current state of the component."""
+        return self.__state.message(state)
 
     def set_state(self, state: ComponentState, msg: None | str = None, add: bool = False) -> None:
         """Set the state of the component.
