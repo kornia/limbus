@@ -357,7 +357,6 @@ class Pipeline:
                 # set the initial state of the components if they are not already set
                 if self._iteration_component_state.get(node, None) is None:
                     self._iteration_component_state[node] = (IterationState.COMPONENT_NOT_EXECUTED, 0)
-            self.resume()
             await asyncio.gather(*tasks)
             # check if there are pending tasks
             pending_tasks: list = []
@@ -401,6 +400,7 @@ class Pipeline:
             iters = 1
 
         # run the pipeline as independent iterations. The loop is only run ince if there are no hooks.
+        self.resume()  # change the state to running
         forever = iters == 0
         while forever or iters > 0:  # run until the pipeline is completed or there are no iters to run
             iters -= 1 if not forever else 0
