@@ -354,7 +354,9 @@ class Pipeline:
             for node in self._nodes:
                 node.set_pipeline(self)
                 tasks.append(node())
-                self._iteration_component_state[node] = (IterationState.COMPONENT_NOT_EXECUTED, 0)
+                # set the initial state of the components if they are not already set
+                if self._iteration_component_state.get(node, None) is None:
+                    self._iteration_component_state[node] = (IterationState.COMPONENT_NOT_EXECUTED, 0)
             self.resume()
             await asyncio.gather(*tasks)
             # check if there are pending tasks
@@ -403,7 +405,9 @@ class Pipeline:
         while forever or iters > 0:  # run until the pipeline is completed or there are no iters to run
             iters -= 1 if not forever else 0
             if self._before_iteration_user_hook is not None:
-                await self._before_iteration_user_hook(self._min_iteration_in_progress)
+                # If there are iteration hooks the min_iteration_in_progress is the last iteration that
+                # was run, so we need to add 1 to get the next iteration.
+                await self._before_iteration_user_hook(self._min_iteration_in_progress + 1)
             await start()
             if self._after_iteration_user_hook is not None:
                 await self._after_iteration_user_hook(self.state)
