@@ -386,7 +386,7 @@ class Component(base_class):
                 self.set_state(ComponentState.RUNNING)
             self.set_state(await self.__run_forward(*args, **kwargs))
         except ComponentStoppedError as e:
-            self.set_state(e.state, add=True)
+            self.set_state(e.state, e.message, add=True)
         except Exception as e:
             self.set_state(ComponentState.ERROR, f"{type(e).__name__} - {str(e)}")
             log.error(f"Error in component {self.name}.\n"

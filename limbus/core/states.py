@@ -1,4 +1,5 @@
 """Define the states for components/pipelines."""
+from __future__ import annotations
 from enum import Enum
 
 
@@ -10,8 +11,9 @@ class ComponentStoppedError(Exception):
         message: explanation of the error.
 
     """
-    def __init__(self, state: "ComponentState"):
+    def __init__(self, state: "ComponentState", message: None | str = None):
         self.state: ComponentState = state
+        self.message: None | str = message
         super().__init__()
 
 
