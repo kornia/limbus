@@ -160,6 +160,13 @@ class Component(base_class):
         except NameError:
             pass
 
+    def __del__(self):
+        self.release()
+
+    def release(self) -> None:
+        """Event executed when the component ends its execution."""
+        pass
+
     def init_from_component(self, ref_component: Component) -> None:
         """Init basic execution params from another component.
 
