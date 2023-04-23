@@ -116,6 +116,7 @@ class TestParam:
         assert p.references == set()
         assert p.arg is None
         assert p._is_subscriptable is False
+        assert p.is_subscriptable is False
         assert p() == p.value
 
     def test_init_with_type(self):
@@ -161,11 +162,20 @@ class TestParam:
     def test_select(self):
         p = Param("a", List[torch.Tensor], value=[torch.tensor(1), torch.tensor(1)])
         assert p._is_subscriptable
+        assert p.is_subscriptable
         iter_param = p.select(0)
         assert isinstance(iter_param, IterableParam)
         assert isinstance(iter_param.iter_container, IterableContainer)
         assert iter_param.iter_container.index == 0
         assert iter_param.iter_container.value == 1
+
+    def test_subscriptable(self):
+        p = Param("a", List[torch.Tensor], value=[torch.tensor(1), torch.tensor(1)])
+        assert p.is_subscriptable
+        p.set_as_non_subscriptable()
+        assert p.is_subscriptable is False
+        p.reset_is_subscriptable()
+        assert p.is_subscriptable
 
     def test_connect_iterparam_param_no_select_raise_error(self):
         p0 = Param("a", List[torch.Tensor])

@@ -252,6 +252,19 @@ class Param:
         self._parent: None | Component = parent
 
     @property
+    def is_subscriptable(self) -> bool:
+        """Return if the parameter is subscriptable."""
+        return self._is_subscriptable
+
+    def reset_is_subscriptable(self) -> None:
+        """Reset the subscriptable flag."""
+        self._is_subscriptable = _check_subscriptable(self._type)
+
+    def set_as_non_subscriptable(self) -> None:
+        """Set the subscriptable flag to False."""
+        self._is_subscriptable = False
+
+    @property
     def parent(self) -> None | Component:
         """Get the parent component."""
         return self._parent
