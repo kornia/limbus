@@ -76,7 +76,55 @@ class Pipeline:
         self._after_iteration_user_hook: None | Callable = None
         self._before_pipeline_user_hook: None | Callable = None
         self._after_pipeline_user_hook: None | Callable = None
+        self._param_sent_user_hook: None | Callable = None
+        self._param_sent_and_consumed_user_hook: None | Callable = None
+        self._param_received_user_hook: None | Callable = None
         self._pipeline_updates_from_component_lock = asyncio.Lock()
+
+    def set_param_received_user_hook(self, hook: None | Callable) -> None:
+        """Set a hook to be executed once a parameter is received.
+
+        This callable must have a single parameter which is the parameter received.
+        Moreover it must be async.
+
+        Prototype: async def hook_name(param: InputParam).
+        """
+        self._param_received_user_hook = hook
+
+    @property
+    def param_received_user_hook(self) -> None | Callable:
+        """Get the param received user hook."""
+        return self._param_received_user_hook
+
+    def set_param_sent_user_hook(self, hook: None | Callable) -> None:
+        """Set a hook to be executed once a parameter is sent.
+
+        This callable must have a single parameter which is the parameter sent.
+        Moreover it must be async.
+
+        Prototype: async def hook_name(param: OutputParam).
+        """
+        self._param_sent_user_hook = hook
+
+    @property
+    def param_sent_user_hook(self) -> None | Callable:
+        """Get the param sent user hook."""
+        return self._param_sent_user_hook
+
+    def set_param_sent_and_consumed_user_hook(self, hook: None | Callable) -> None:
+        """Set a hook to be executed once a sent parameter is consumed by all its references.
+
+        This callable must have a single parameter which is the parameter sent.
+        Moreover it must be async.
+
+        Prototype: async def hook_name(param: OutputParam).
+        """
+        self._param_sent_and_consumed_user_hook = hook
+
+    @property
+    def param_sent_and_consumed_user_hook(self) -> None | Callable:
+        """Get the param sent user hook."""
+        return self._param_sent_and_consumed_user_hook
 
     def set_before_pipeline_user_hook(self, hook: None | Callable) -> None:
         """Set a hook to be executed before the pipeline execution.
