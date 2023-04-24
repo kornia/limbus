@@ -111,21 +111,6 @@ class Pipeline:
         """Get the param sent user hook."""
         return self._param_sent_user_hook
 
-    def set_param_sent_and_consumed_user_hook(self, hook: None | Callable) -> None:
-        """Set a hook to be executed once a sent parameter is consumed by all its references.
-
-        This callable must have a single parameter which is the parameter sent.
-        Moreover it must be async.
-
-        Prototype: async def hook_name(param: OutputParam).
-        """
-        self._param_sent_and_consumed_user_hook = hook
-
-    @property
-    def param_sent_and_consumed_user_hook(self) -> None | Callable:
-        """Get the param sent user hook."""
-        return self._param_sent_and_consumed_user_hook
-
     def set_before_pipeline_user_hook(self, hook: None | Callable) -> None:
         """Set a hook to be executed before the pipeline execution.
 

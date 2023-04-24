@@ -381,7 +381,7 @@ class Param:
         # if isinstance(dst, Param) and dst._is_subscriptable:
         #    raise ValueError(f"The param '{dst.name}' must be connected using indexes.")
 
-        # NOTE that there are not type validation, we will trust in the user to connect params.
+        # NOTE that there is not type validation, we will trust in the user to connect params.
         # We only check when there is an explicit value in the ori param.
         if isinstance(ori, Param) and not isinstance(ori.value, NoValue):
             if isinstance(dst, Param):
@@ -487,6 +487,7 @@ class InputParam(Param):
     async def receive(self) -> Any:
         """Wait until the input param receives a value from the connected output param."""
         assert self._parent is not None
+        self._parent._Component__num_params_waiting_to_receive += 1
         if self.references:
             for ref in self.references:
                 # NOTE: each input param can be connected to 0 or 1 output param (N output params if it is iterable).
@@ -539,15 +540,19 @@ class InputParam(Param):
                 assert isinstance(ref.consumed, asyncio.Event)
                 ref.consumed.set()  # denote that the param is consumed
                 ref.sent.clear()  # allow to know to the sender that it can send again
-                self._parent.set_state(ComponentState.RUNNING)
-                if self._parent.pipeline and self._parent.pipeline.before_component_user_hook:
-                    await self._parent.pipeline.before_component_user_hook(self._parent)
-            return value
         else:
+            value = self.value
+        await self._are_all_waiting_params_received()
+        if self._parent.pipeline and self._parent.pipeline.param_received_user_hook:
+            await self._parent.pipeline.param_received_user_hook(self)
+        return value
+
+    async def _are_all_waiting_params_received(self) -> None:
+        """Check if the component is waiting for other params before changing the component state."""
+        assert self._parent is not None
+        self._parent._Component__num_params_waiting_to_receive -= 1
+        if self._parent._Component__num_params_waiting_to_receive == 0:
             self._parent.set_state(ComponentState.RUNNING)
-            if self._parent.pipeline and self._parent.pipeline.before_component_user_hook:
-                await self._parent.pipeline.before_component_user_hook(self._parent)
-            return self.value
 
 
 class OutputParam(Param):
@@ -571,6 +576,9 @@ class OutputParam(Param):
             self._parent.set_state(ComponentState.SENDING_PARAMS,
                                    f"{self._parent.name}.{self.name} -> {dst_param.parent.name}.{dst_param.name}")
             async_utils.create_task_if_needed(self._parent, dst_param.parent)
+
+        if self._parent.pipeline and self._parent.pipeline.param_sent_user_hook:
+            await self._parent.pipeline.param_sent_user_hook(self)
 
         # wait until all the input params read the value
         await asyncio.gather(*[ref.consumed.wait() for ref in self.references if ref.consumed is not None])

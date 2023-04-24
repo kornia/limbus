@@ -150,6 +150,7 @@ class Component(base_class):
         self.__exec_counter: int = 0  # Counter of executions.
         # Last execution to be run in the __call__ loop.
         self.__stopping_execution: int = 0  # 0 means run forever
+        self.__num_params_waiting_to_receive: int = 0  # updated from InputParam
 
         # method called in _run_with_hooks to execute the component forward method
         self.__run_forward: Callable[..., Coroutine[Any, Any, ComponentState]] = self.forward
@@ -382,14 +383,14 @@ class Component(base_class):
         self.__exec_counter += 1
         if self.__pipeline is not None:
             await self.__pipeline.before_component_hook(self)
+            if self.__pipeline.before_component_user_hook:
+                await self.__pipeline.before_component_user_hook(self)
             if self._stop_if_needed():  # just in case the component state is changed in the before_component_hook
                 return True
         # run the component
         try:
             if len(self._inputs) == 0:
                 # RUNNING state is set once the input params are received, if there are not inputs the state is set here
-                if self.__pipeline is not None and self.__pipeline.before_component_user_hook:
-                    await self.__pipeline.before_component_user_hook(self)
                 self.set_state(ComponentState.RUNNING)
             self.set_state(await self.__run_forward(*args, **kwargs))
         except ComponentStoppedError as e:
