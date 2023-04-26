@@ -119,6 +119,15 @@ class TestParam:
         assert p.is_subscriptable is False
         assert p() == p.value
 
+    def test_subcriptability(self):
+        p = Param("a", List[torch.Tensor], value=[torch.tensor(1), torch.tensor(1)])
+        assert p._is_subscriptable
+        assert p.is_subscriptable
+        p.set_as_non_subscriptable()
+        assert not p._is_subscriptable
+        p.reset_is_subscriptable()
+        assert p._is_subscriptable
+
     def test_init_with_type(self):
         p = Param("a", tp=int)
         assert p.type is int

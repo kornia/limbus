@@ -456,10 +456,14 @@ class Pipeline:
             if self._state.state in [PipelineState.FORCED_STOP, PipelineState.ERROR, PipelineState.ENDED]:
                 break
 
-        for node in self._nodes:
-            node.release()
-        if self.after_pipeline_user_hook is not None:
-            await self.after_pipeline_user_hook(self.state)
+        if iters > 0 and self._state.state == PipelineState.RUNNING:
+            self.pause()
+
+        if self._state.state in [PipelineState.FORCED_STOP, PipelineState.ERROR, PipelineState.ENDED]:
+            for node in self._nodes:
+                node.release()
+            if self.after_pipeline_user_hook is not None:
+                await self.after_pipeline_user_hook(self.state)
         return self._state.state
 
     def run(self, iters: int = 0) -> PipelineState:

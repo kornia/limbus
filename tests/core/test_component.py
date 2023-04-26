@@ -46,6 +46,17 @@ class TestComponent:
         assert cmp.outputs is not None
         assert cmp.properties is not None
 
+    def test_set_state(self):
+        cmp = Component("yuhu")
+        cmp.set_state(ComponentState.PAUSED)
+        cmp.state == ComponentState.PAUSED
+        cmp.state_message(ComponentState.PAUSED) is None
+        cmp.state_message(ComponentState.FORCED_STOP) is None
+        cmp.set_state(ComponentState.ERROR, "error")
+        cmp.state == ComponentState.ERROR
+        cmp.state_message(ComponentState.ERROR) == "error"
+        cmp.state_message(ComponentState.FORCED_STOP) is None
+
     def test_set_properties(self):
         class A(Component):
             @staticmethod
