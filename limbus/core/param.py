@@ -204,7 +204,9 @@ class Reference:
 
     """
     param: "Param"
+    ori_param: "Param"  # added to avoid duplicated references, it is rare but it could happen.
     index: None | int = None
+    ori_index: None | int = None  # added to avoid duplicated references, it is rare but it could happen.
     # allow to know if there is a new value for the parameter
     sent: None | asyncio.Event = None
     # allow to know if the value has been consumed
@@ -213,13 +215,14 @@ class Reference:
     def __hash__(self) -> int:
         # this method is required to be able to use Reference in a set.
         # Note that we don't use the consumed attribute in the hash since it is dynamic.
-        return hash((self.param, self.index))
+        return hash((self.param, self.index, self.ori_param, self.ori_index))
 
     def __eq__(self, other: Any) -> bool:
         # this method is required to be able to use Reference in a set.
         # Note that we don't use the consumed attribute in the hash since it is dynamic.
         if isinstance(other, Reference):
-            return self.param == other.param and self.index == other.index
+            return (self.param == other.param and self.index == other.index and
+                    self.ori_param == other.ori_param and self.ori_index == other.ori_index)
         return False
 
 
@@ -470,11 +473,11 @@ class Param:
             # references of both params.
             consumed_event = asyncio.Event()
             sent_event = asyncio.Event()
-            ori._refs[ori_idx].add(Reference(dst, dst_idx, sent_event, consumed_event))
-            dst._refs[dst_idx].add(Reference(ori, ori_idx, sent_event, consumed_event))
+            ori._refs[ori_idx].add(Reference(dst, ori, dst_idx, ori_idx, sent_event, consumed_event))
+            dst._refs[dst_idx].add(Reference(ori, dst, ori_idx, dst_idx, sent_event, consumed_event))
         elif type == 'remove':
-            ori._refs[ori_idx].remove(Reference(dst, dst_idx))
-            dst._refs[dst_idx].remove(Reference(ori, ori_idx))
+            ori._refs[ori_idx].remove(Reference(dst, ori, dst_idx, ori_idx))
+            dst._refs[dst_idx].remove(Reference(ori, dst, ori_idx, dst_idx))
 
     def disconnect(self, dst: "Param" | IterableParam) -> None:
         """Disconnect this parameter (output) from the dst (input) parameter."""
