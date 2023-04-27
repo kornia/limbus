@@ -147,7 +147,7 @@ class Pipeline:
         This callable must have a single parameter which is an int denoting the iter being executed.
         Moreover it must be async.
 
-        Prototype: async def hook_name(counter: int).
+        Prototype: async def hook_name(counter: int, state: PipelineState).
         """
         self._before_iteration_user_hook = hook
 
@@ -440,7 +440,7 @@ class Pipeline:
             if self._before_iteration_user_hook is not None:
                 # If there are iteration hooks the min_iteration_in_progress is the last iteration that
                 # was run, so we need to add 1 to get the next iteration.
-                await self._before_iteration_user_hook(self._min_iteration_in_progress + 1)
+                await self._before_iteration_user_hook(self._min_iteration_in_progress + 1, self.state)
             await start()
             if self._after_iteration_user_hook is not None:
                 await self._after_iteration_user_hook(self.state)

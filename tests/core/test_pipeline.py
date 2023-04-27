@@ -186,13 +186,13 @@ class TestPipeline:
             assert "state: PipelineState.ENDED" in caplog.text
 
     def test_before_iteration_user_hook(self, caplog):
-        async def iteration_hook(iter: int):
-            log.info(f"iteration: {iter}")
+        async def iteration_hook(iter: int, state: PipelineState):
+            log.info(f"iteration: {iter} ({state})")
         pipeline = self.my_testing_pipeline()
         pipeline.set_before_iteration_user_hook(iteration_hook)
         with caplog.at_level(logging.INFO):
             pipeline.run(1)
-            assert "iteration: 1" in caplog.text
+            assert "iteration: 1 (PipelineState.RUNNING)" in caplog.text
 
     def test_after_iteration_user_hook(self, caplog):
         async def iteration_hook(state: PipelineState):
