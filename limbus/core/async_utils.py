@@ -8,6 +8,9 @@ from sys import version_info
 if TYPE_CHECKING:
     from limbus.core.component import Component
 
+# Get the loop that is going to run the pipeline. Doing it in this way allows to rerun the pipeline.
+loop = asyncio.new_event_loop()
+
 
 def run_coroutine(coro: Coroutine) -> None:
     """Run a coroutine in an event loop.
@@ -16,15 +19,8 @@ def run_coroutine(coro: Coroutine) -> None:
         coro: coroutine to run.
 
     """
-    if version_info.major != 3:
-        raise ValueError("Only python 3 is supported.")
-    if version_info.minor < 10:
-        # for python <3.10 the loop must be run in this way to avoid creating a new loop.
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(coro)
-    elif version_info.minor >= 10:
-        # for python >=3.10 the loop should be run in this way.
-        asyncio.run(coro)
+    global loop
+    loop.run_until_complete(coro)
 
 
 def get_task_if_exists(component: Component) -> None | asyncio.Task:

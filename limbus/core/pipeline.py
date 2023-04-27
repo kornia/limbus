@@ -399,7 +399,9 @@ class Pipeline:
                     pending_tasks.append(t)
             await asyncio.gather(*pending_tasks)
 
-        self._state(PipelineState.STARTED)
+        # if it was previously run then the state is not changed to STARTED
+        if self._state.state == PipelineState.INITIALIZING:
+            self._state(PipelineState.STARTED)
         if len(self._nodes) == 0:
             self._state(PipelineState.EMPTY, "No components added to the pipeline")
 
@@ -456,7 +458,7 @@ class Pipeline:
             if self._state.state in [PipelineState.FORCED_STOP, PipelineState.ERROR, PipelineState.ENDED]:
                 break
 
-        if iters > 0 and self._state.state == PipelineState.RUNNING:
+        if not forever and self._state.state == PipelineState.RUNNING:
             self.pause()
 
         if self._state.state in [PipelineState.FORCED_STOP, PipelineState.ERROR, PipelineState.ENDED]:
