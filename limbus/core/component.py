@@ -152,7 +152,7 @@ class Component(base_class):
         self.__stopping_execution: int = 0  # 0 means run forever
         self.__num_params_waiting_to_receive: int = 0  # updated from InputParam
 
-        # method called in _run_with_hooks to execute the component forward method
+        # method called in __run_with_hooks to execute the component forward method
         self.__run_forward: Callable[..., Coroutine[Any, Any, ComponentState]] = self.forward
         try:
             if nn.Module in Component.__mro__:
@@ -322,7 +322,7 @@ class Component(base_class):
         """Set the pipeline running the component."""
         self.__pipeline = pipeline
 
-    def _stop_component(self) -> None:
+    def __stop_component(self) -> None:
         """Prepare the component to be stopped."""
         for input in self._inputs.get_params():
             for ref in self._inputs[input].references:
@@ -349,7 +349,7 @@ class Component(base_class):
         NOTE 1: If you want to use `async for...` instead of `while True` this method must be overridden.
         E.g.:
             async for x in xyz:
-                if await self._run_with_hooks(x):
+                if await self.__run_with_hooks(x):
                     break
 
             Note that in this example the forward method will require 1 parameter.
@@ -358,7 +358,7 @@ class Component(base_class):
 
         """
         while True:
-            if await self._run_with_hooks():
+            if await self.__run_with_hooks():
                 break
 
     def is_stopped(self) -> bool:
@@ -369,23 +369,23 @@ class Component(base_class):
             return True
         return False
 
-    def _stop_if_needed(self) -> bool:
+    def __stop_if_needed(self) -> bool:
         """Stop the component if it is required."""
         if self.is_stopped():
             if ComponentState.STOPPED_AT_ITER not in self.state:
                 # in this case we need to force the stop of the component. When it is stopped at a given iter
                 # the pipeline ends without forcing anything.
-                self._stop_component()
+                self.__stop_component()
             return True
         return False
 
-    async def _run_with_hooks(self, *args, **kwargs) -> bool:
+    async def __run_with_hooks(self, *args, **kwargs) -> bool:
         self.__exec_counter += 1
         if self.__pipeline is not None:
             await self.__pipeline.before_component_hook(self)
             if self.__pipeline.before_component_user_hook:
                 await self.__pipeline.before_component_user_hook(self)
-            if self._stop_if_needed():  # just in case the component state is changed in the before_component_hook
+            if self.__stop_if_needed():  # just in case the component state is changed in the before_component_hook
                 return True
         # run the component
         try:
@@ -404,7 +404,7 @@ class Component(base_class):
             await self.__pipeline.after_component_hook(self)
             if self.__pipeline.after_component_user_hook:
                 await self.__pipeline.after_component_user_hook(self)
-            if self._stop_if_needed():
+            if self.__stop_if_needed():
                 return True
             return False
         # if there is not a pipeline, the component is executed only once
