@@ -12,6 +12,13 @@ if TYPE_CHECKING:
 loop = asyncio.new_event_loop()
 
 
+def reset_loop() -> asyncio.AbstractEventLoop:
+    """Reset the loop."""
+    global loop
+    loop = asyncio.new_event_loop()
+    return loop
+
+
 def run_coroutine(coro: Coroutine) -> None:
     """Run a coroutine in an event loop.
 
@@ -20,6 +27,8 @@ def run_coroutine(coro: Coroutine) -> None:
 
     """
     global loop
+    if loop.is_closed():
+        loop = reset_loop()
     loop.run_until_complete(coro)
 
 
