@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from collections import defaultdict
 import typing
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, Callable
 import inspect
 import collections
 import asyncio
@@ -235,10 +235,11 @@ class Param:
         value (optional): value of the parameter. Default: NoValue().
         arg (optional): name of the argument in the component constructor related with this param. Default: None.
         parent (optional): parent component. Default: None.
+        callback (optional): callback to be called when the value of the parameter changes. Default: None.
 
     """
     def __init__(self, name: str, tp: Any = Any, value: Any = NoValue(), arg: None | str = None,
-                 parent: None | Component = None) -> None:
+                 parent: None | Component = None, callback: Callable | None = None) -> None:
         # validate that the type is coherent with the value
         if not isinstance(value, NoValue):
             typeguard.check_type(name, value, tp)
@@ -253,6 +254,7 @@ class Param:
         # only sequences with tensors inside are subscriptable
         self._is_subscriptable = _check_subscriptable(tp)
         self._parent: None | Component = parent
+        self._callback: None | Callable = callback
 
     @property
     def is_subscriptable(self) -> bool:
