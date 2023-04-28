@@ -11,3 +11,5 @@ def event_loop_instance():
     if async_utils.loop.is_closed():
         async_utils.reset_loop()
     asyncio.set_event_loop(async_utils.loop)
+    yield async_utils.loop
+    async_utils.loop.close()
