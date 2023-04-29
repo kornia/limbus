@@ -25,14 +25,26 @@ class Add(Component):
     inputs: InputsTyping  # type: ignore
     outputs: OutputsTyping  # type: ignore
 
+    async def val_rec_a(self, value: Any) -> Any:  # noqa: D102
+        print(f"CALLBACK: Add.a: {value}.")
+        return value
+
+    async def val_rec_b(self, value: Any) -> Any:  # noqa: D102
+        print(f"CALLBACK: Add.b: {value}.")
+        return value
+
+    async def val_sent(self, value: Any) -> Any:  # noqa: D102
+        print(f"CALLBACK: Add.out: {value}.")
+        return value
+
     @staticmethod
     def register_inputs(inputs: InputParams) -> None:  # noqa: D102
-        inputs.declare("a", int)
-        inputs.declare("b", int)
+        inputs.declare("a", int, callback=Add.val_rec_a)
+        inputs.declare("b", int, callback=Add.val_rec_b)
 
     @staticmethod
     def register_outputs(outputs: OutputParams) -> None:  # noqa: D102
-        outputs.declare("out", int)
+        outputs.declare("out", int, callback=Add.val_sent)
 
     async def forward(self) -> ComponentState:  # noqa: D102
         a, b = await asyncio.gather(self._inputs.a.receive(), self._inputs.b.receive())
@@ -49,9 +61,13 @@ class Printer(Component):
 
     inputs: InputsTyping  # type: ignore
 
+    async def val_changed(self, value: Any) -> Any:  # noqa: D102
+        print(f"CALLBACK: Printer.inp: {value}.")
+        return value
+
     @staticmethod
     def register_inputs(inputs: InputParams) -> None:  # noqa: D102
-        inputs.declare("inp", Any)
+        inputs.declare("inp", Any, callback=Printer.val_changed)
 
     async def forward(self) -> ComponentState:  # noqa: D102
         value = await self._inputs.inp.receive()
