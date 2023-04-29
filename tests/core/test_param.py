@@ -117,7 +117,6 @@ class TestParam:
         assert p.arg is None
         assert p._is_subscriptable is False
         assert p.is_subscriptable is False
-        assert p() == p.value
 
     def test_subcriptability(self):
         p = Param("a", List[torch.Tensor], value=[torch.tensor(1), torch.tensor(1)])
@@ -136,7 +135,6 @@ class TestParam:
     def test_init_with_value(self):
         p = Param("a", tp=int, value=1)
         assert p.value == 1
-        assert p() == 1
 
     def test_init_with_invalid_value_raise_error(self):
         with pytest.raises(TypeError):

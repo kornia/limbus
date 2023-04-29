@@ -302,10 +302,6 @@ class Param(ABC):
             refs = refs.union(ref_set)
         return refs
 
-    def __call__(self) -> Any:
-        """Get the value of the parameter."""
-        return self.value
-
     @property
     def value(self) -> Any:
         """Get the value of the parameter."""
