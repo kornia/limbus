@@ -8,6 +8,7 @@ import inspect
 import collections
 import asyncio
 import contextlib
+from abc import ABC
 
 import typeguard
 
@@ -226,7 +227,7 @@ class Reference:
         return False
 
 
-class Param:
+class Param(ABC):
     """Class to store data for each parameter.
 
     Args:
@@ -486,6 +487,18 @@ class Param:
         self._disconnect(self, dst)
 
 
+class PropParam(Param):
+    """Class to manage the comunication for each property parameter."""
+
+    async def set_property(self, value: Any) -> None:
+        """Set the value of the property."""
+        assert self._parent is not None
+        if self._callback is None:
+            self.value = value
+        else:
+            self.value = await self._callback(self._parent, self.value)
+
+
 class InputParam(Param):
     """Class to manage the comunication for each input parameter."""
 
@@ -548,7 +561,12 @@ class InputParam(Param):
         else:
             value = self.value
         await self._are_all_waiting_params_received()
+        if self._callback is not None:
+            # specific callback for this param
+            value = await self._callback(self._parent, value)
+
         if self._parent.pipeline and self._parent.pipeline.param_received_user_hook:
+            # hook from the pipeline, all the components and input params run the same code
             await self._parent.pipeline.param_received_user_hook(self)
         return value
 
@@ -566,7 +584,11 @@ class OutputParam(Param):
     async def send(self, value: Any) -> None:
         """Send the value of this param to the connected input params."""
         assert self._parent is not None
-        self.value = value  # set the value for the param
+        if self._callback is None:
+            self.value = value  # set the value for the param
+        else:
+            self.value = await self._callback(self._parent, value)
+
         for ref in self.references:
             assert isinstance(ref.sent, asyncio.Event)
             assert isinstance(ref.consumed, asyncio.Event)

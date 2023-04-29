@@ -1,42 +1,26 @@
 """Classes to define set of parameters."""
 from __future__ import annotations
 from typing import Any, Iterator, Iterable, Callable
+from abc import ABC, abstractmethod
 
 # Note that Component class cannot be imported to avoid circular dependencies.
 # Since it is only used for type hints we import the module and use "component.Component" for typing.
 from limbus.core import component
-from limbus.core.param import Param, NoValue, InputParam, OutputParam
+from limbus.core.param import Param, NoValue, InputParam, OutputParam, PropParam
 
 
-class Params(Iterable):
+class Params(Iterable, ABC):
     """Class to store parameters."""
 
     def __init__(self, parent_component: None | "component.Component" = None):
         super().__init__()
         self._parent = parent_component
 
-    def declare(self, name: str, tp: Any = Any, value: Any = NoValue(), arg: None | str = None,
-                callback: Callable | None = None) -> None:
-        """Add or modify a param.
 
-        Args:
-            name: name of the parameter.
-            tp: type (e.g. str, int, list, str | int,...). Default: typing.Any
-            value (optional): value for the parameter. Default: NoValue().
-            arg (optional): Component argument directly related with the value of the parameter. Default: None.
-                            E.g. this is useful to propagate datatypes and values from a pin with a default value to
-                            an argument in a Component (GUI).
-            callback (optional): callback function to be called when the parameter value changes. Default: None.
-
-        """
-        if isinstance(value, Param):
-            value = value.value
-        setattr(self, name, Param(name, tp, value, arg, self._parent, callback))
-
-    def __getattr__(self, name: str) -> Param:  # type: ignore  # it should return a Param
-        """Trick to avoid mypy issues with dinamyc attributes."""
-        ...
-
+    @abstractmethod
+    def declare(self, *args, **kwargs) -> None:
+        """Add or modify a param."""
+        raise NotImplementedError
     def get_related_arg(self, name: str) -> None | str:
         """Return the argument in the Component constructor related with a given param.
 
@@ -121,25 +105,44 @@ class Params(Iterable):
 class InputParams(Params):
     """Class to manage input parameters."""
 
-    def declare(self, name: str, tp: Any = Any, value: Any = NoValue(), arg: None | str = None,
-                callback: Callable | None = None) -> None:
+    def declare(self, name: str, tp: Any = Any, value: Any = NoValue(), callback: Callable | None = None) -> None:
         """Add or modify a param.
 
         Args:
             name: name of the parameter.
             tp: type (e.g. str, int, list, str | int,...). Default: typing.Any
             value (optional): value for the parameter. Default: NoValue().
-            arg (optional): Component argument directly related with the value of the parameter. Default: None.
-                            E.g. this is useful to propagate datatypes and values from a pin with a default value to
-                            an argument in a Component (GUI).
+
             callback (optional): callback function to be called when the parameter value changes. Default: None.
 
         """
         if isinstance(value, Param):
             value = value.value
-        setattr(self, name, InputParam(name, tp, value, arg, self._parent, callback))
+        setattr(self, name, InputParam(name, tp, value, None, self._parent, callback))
 
     def __getattr__(self, name: str) -> InputParam:  # type: ignore  # it should return an InitParam
+        """Trick to avoid mypy issues with dinamyc attributes."""
+        ...
+
+
+class PropParams(Params):
+    """Class to manage property parameters."""
+
+    def declare(self, name: str, tp: Any = Any, value: Any = NoValue(), callback: Callable | None = None) -> None:
+        """Add or modify a param.
+
+        Args:
+            name: name of the parameter.
+            tp: type (e.g. str, int, list, str | int,...). Default: typing.Any
+            value (optional): value for the parameter. Default: NoValue().
+            callback (optional): callback function to be called when the parameter value changes. Default: None.
+
+        """
+        if isinstance(value, Param):
+            value = value.value
+        setattr(self, name, PropParam(name, tp, value, None, self._parent, callback))
+
+    def __getattr__(self, name: str) -> PropParam:  # type: ignore  # it should return an InitParam
         """Trick to avoid mypy issues with dinamyc attributes."""
         ...
 
@@ -147,23 +150,19 @@ class InputParams(Params):
 class OutputParams(Params):
     """Class to manage output parameters."""
 
-    def declare(self, name: str, tp: Any = Any, value: Any = NoValue(), arg: None | str = None,
-                callback: Callable | None = None) -> None:
+    def declare(self, name: str, tp: Any = Any, arg: None | str = None, callback: Callable | None = None) -> None:
         """Add or modify a param.
 
         Args:
             name: name of the parameter.
             tp: type (e.g. str, int, list, str | int,...). Default: typing.Any
-            value (optional): value for the parameter. Default: NoValue().
             arg (optional): Component argument directly related with the value of the parameter. Default: None.
                             E.g. this is useful to propagate datatypes and values from a pin with a default value to
                             an argument in a Component (GUI).
             callback (optional): callback function to be called when the parameter value changes. Default: None.
 
         """
-        if isinstance(value, Param):
-            value = value.value
-        setattr(self, name, OutputParam(name, tp, value, arg, self._parent, callback))
+        setattr(self, name, OutputParam(name, tp, NoValue(), arg, self._parent, callback))
 
     def __getattr__(self, name: str) -> OutputParam:  # type: ignore  # it should return an OutputParam
         """Trick to avoid mypy issues with dinamyc attributes."""
