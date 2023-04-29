@@ -285,34 +285,6 @@ class Component(base_class):
         """
         pass
 
-    def set_properties(self, **kwargs) -> bool:
-        """Simplify the way to set the viz params.
-
-        You can pass all the viz params you want to set as keyword arguments.
-
-        These 2 codes are equivalent:
-        >> component.set_properties(param_name_0=value_0, param_name_1=value_1, ...)
-
-        and
-        >> component.properties.set_param('param_name_0', value_0)
-        >> component.properties.set_param('param_name_1', value_1)
-        >> .
-        >> .
-
-        Returns:
-            bool: True if all the passed viz params were setted, False otherwise.
-
-        """
-        all_ok = True
-        properties: list[str] = self._properties.get_params()
-        for key, value in kwargs.items():
-            if key in properties:
-                self._properties.set_param(key, value)
-            else:
-                log.warning(f"In component {self._name} the param {key} is not a valid viz param.")
-                all_ok = False
-        return all_ok
-
     @property
     def pipeline(self) -> None | Pipeline:
         """Get the pipeline object."""
