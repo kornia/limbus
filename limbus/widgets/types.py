@@ -1,7 +1,8 @@
 """Module containing the visualization interfaces."""
+from __future__ import annotations
 from abc import abstractmethod
 import math
-from typing import Optional, Union, List, Callable, Set, Tuple, Dict, Any
+from typing import Callable, Any
 import logging
 import functools
 
@@ -45,12 +46,12 @@ def _get_title_from_args(*args, **kwargs) -> str:
         raise ValueError("No title found in args or kwargs.")
 
 
-def _set_title_in_args(title: str, args: Tuple[Any, ...], kwargs: Dict[Any, Any]
-                       ) -> Tuple[Tuple[Any, ...], Dict[Any, Any]]:
+def _set_title_in_args(title: str, args: tuple[Any, ...], kwargs: dict[Any, Any]
+                       ) -> tuple[tuple[Any, ...], dict[Any, Any]]:
     # NOTE: this is a hack to update the title from the args. We know that the second argument is the title in all the
     # methods.
     if len(args) > 1:
-        new_args: List[Any] = list(args)
+        new_args: list[Any] = list(args)
         new_args[1] = title
         return (tuple(new_args), kwargs)
     elif "title" in kwargs:
@@ -134,8 +135,8 @@ class Viz:
 
     @abstractmethod
     def show_images(self, component: Component, title: str,
-                    images: Union["torch.Tensor", List["torch.Tensor"]],
-                    nrow: Optional[int] = None
+                    images: "torch.Tensor" | list["torch.Tensor"],
+                    nrow: None | int = None
                     ) -> None:
         """Show a batch of images.
 
@@ -174,7 +175,7 @@ class Visdom(Viz):
         except:
             raise ImportError("To use Visdom as backend install the widgets extras: "
                               "pip install limbus[widgets]")
-        self._vis: Optional[visdom.Visdom] = None
+        self._vis: None | visdom.Visdom = None
         self._try_init()
 
     def _try_init(self) -> None:
@@ -219,8 +220,8 @@ class Visdom(Viz):
     @is_enabled
     @set_title
     def show_images(self, component: Component, title: str,
-                    images: Union["torch.Tensor", List["torch.Tensor"]],
-                    nrow: Optional[int] = None
+                    images: "torch.Tensor" | list["torch.Tensor"],
+                    nrow: None | int = None
                     ) -> None:
         """Show a batch of images.
 
@@ -283,8 +284,8 @@ class Console(Viz):
     @is_enabled
     @set_title
     def show_images(self, component: Component, title: str,
-                    images: Union["torch.Tensor", List["torch.Tensor"]],
-                    nrow: Optional[int] = None
+                    images: "torch.Tensor" | list["torch.Tensor"],
+                    nrow: None | int = None
                     ) -> None:
         """Show a batch of images.
 
@@ -357,8 +358,8 @@ class OpenCV(Console):
     @is_enabled
     @set_title
     def show_images(self, component: Component, title: str,
-                    images: Union["torch.Tensor", List["torch.Tensor"]],
-                    nrow: Optional[int] = None
+                    images: "torch.Tensor" | list["torch.Tensor"],
+                    nrow: None | int = None
                     ) -> None:
         """Show a batch of images.
 

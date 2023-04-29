@@ -1,7 +1,6 @@
 """Basic example with predefined cmps."""
 import asyncio
 from sys import version_info
-import copy
 
 import torch
 
@@ -34,6 +33,8 @@ if USING_PIPELINE:
     # create the pipeline and add its nodes
     pipeline = Pipeline()
     pipeline.add_nodes([c1, t1, t2, stack, show])
+    pipeline.run(1)
+    # You can rerun the pipeline as many times as you want and will continue from the last iteration
     pipeline.run(1)
 else:
     # run 1 iteration using the asyncio loop

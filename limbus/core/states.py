@@ -1,4 +1,5 @@
 """Define the states for components/pipelines."""
+from __future__ import annotations
 from enum import Enum
 
 
@@ -10,8 +11,9 @@ class ComponentStoppedError(Exception):
         message: explanation of the error.
 
     """
-    def __init__(self, state: "ComponentState"):
+    def __init__(self, state: "ComponentState", message: None | str = None):
         self.state: ComponentState = state
+        self.message: None | str = message
         super().__init__()
 
 
@@ -36,6 +38,7 @@ class ComponentState(Enum):
     SENDING_PARAMS = 9
     STOPPED_AT_ITER = 10  # when the stop is because of the iteration number
     READY = 11  # when the component is ready to be executed at the beginning of each iteration
+    STOPPED_BY_COMPONENT = 12  # when the stop is because another component forces it
 
 
 class PipelineState(Enum):
@@ -48,4 +51,10 @@ class PipelineState(Enum):
     RUNNING = 5
     INITIALIZING = 6
     FORCED_STOP = 7
-    CREATED = 8
+
+
+class IterationState(Enum):
+    """Internal state to control the pipeline iterations."""
+    COMPONENT_EXECUTED = 0
+    COMPONENT_NOT_EXECUTED = 1
+    COMPONENT_IN_EXECUTION = 2

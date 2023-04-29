@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from collections import defaultdict
 import typing
-from typing import Dict, Any, Set, Optional, List, Union, Tuple, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 import inspect
 import collections
 import asyncio
@@ -17,7 +17,7 @@ from limbus.core import async_utils
 if TYPE_CHECKING:
     from limbus.core.component import Component
 
-SUBSCRIPTABLE_TYPES: List[type] = []
+SUBSCRIPTABLE_TYPES: list[type] = []
 try:
     import torch
     SUBSCRIPTABLE_TYPES.append(torch.Tensor)
@@ -50,7 +50,7 @@ class IterableContainer:
     This number is not explicitly controlled. It is implicitly controlled in the Param class.
 
     """
-    container: Union[Container, "IterableContainer"]
+    container: Container | "IterableContainer"
     index: int
 
     @property
@@ -68,11 +68,11 @@ class IterableContainer:
 
 class IterableInputContainers:
     """Denote that an input param is a sequence of Containers."""
-    def __init__(self, container: Optional[IterableContainer] = None):
+    def __init__(self, container: None | IterableContainer = None):
         containers = []
         if container is not None:
             containers = [container]
-        self._containers: List[IterableContainer] = containers
+        self._containers: list[IterableContainer] = containers
 
     def __len__(self) -> int:
         return len(self._containers)
@@ -88,16 +88,16 @@ class IterableInputContainers:
                 self._containers.remove(container)
                 return
 
-    def get_ordered(self) -> List[Any]:
+    def get_ordered(self) -> list[Any]:
         """Return a list with the values in the order denoted by the index in the IterableValue."""
-        indices: List[int] = []
+        indices: list[int] = []
         for container in self._containers:
             assert isinstance(container, IterableContainer)
             indices.append(container.index)
 
-        containers: List[Any] = []
+        containers: list[Any] = []
         for pos_idx in sorted(range(len(indices)), key=indices.__getitem__):  # argsort
-            obj: Union[Container, IterableContainer] = self._containers[pos_idx].container
+            obj: Container | IterableContainer = self._containers[pos_idx].container
             if isinstance(obj, IterableContainer):
                 obj = obj.container.value[obj.index]  # type: ignore  # Iterable[Any] is not indexable [index]
             else:
@@ -117,15 +117,13 @@ def _check_subscriptable(datatype: type) -> bool:
         bool: True if datatype is a subscriptable with tensors, False otherwise.
 
     """
-    if inspect.isclass(datatype):
-        return False
-
-    # in this case is a typing expresion
     # we need to know if it is a variable size datatype, we assume that all the sequences are variable size
-    # if they contain tensors. E.g. List[Tensor], Tuple[Tensor], Sequence[Tensor].
-    # Note that e.g. for the case Tuple[Tensor, Tensor] we don't assume it is variable since the size is known.
+    # if they contain tensors. E.g. list[Tensor], tuple[Tensor], Sequence[Tensor].
+    # Note that e.g. for the case tuple[Tensor, Tensor] we don't assume it is variable since the size is known.
     origin = typing.get_origin(datatype)
-    datatype_args: Tuple = typing.get_args(datatype)
+    if origin is None:  # discard datatypes that are not typing expressions
+        return False
+    datatype_args: tuple = typing.get_args(datatype)
     if inspect.isclass(origin):
         is_abstract: bool = inspect.isabstract(origin)
         is_abstract_seq: bool = origin is collections.abc.Sequence or origin is collections.abc.Iterable
@@ -142,7 +140,7 @@ class IterableParam:
     def __init__(self, param: "Param", index: int) -> None:
         self._param: Param = param
         # TODO: validate that _iter_container can be an IterableInputContainers, I feel it cannot!!
-        self._iter_container: Union[IterableContainer, IterableInputContainers]
+        self._iter_container: IterableContainer | IterableInputContainers
         if isinstance(param.container, Container):
             self._iter_container = IterableContainer(param.container, index)
         elif isinstance(param.container, IterableInputContainers):
@@ -162,7 +160,7 @@ class IterableParam:
         return self._iter_container.index
 
     @property
-    def value(self) -> Union[Any, List[Any]]:
+    def value(self) -> Any | list[Any]:
         """Get the value of the parameter.
 
         It can be a list of values if the parameter is an IterableInputContainers.
@@ -175,7 +173,7 @@ class IterableParam:
             return self._iter_container.get_ordered()
 
     @property
-    def iter_container(self) -> Union[IterableContainer, IterableInputContainers]:
+    def iter_container(self) -> IterableContainer | IterableInputContainers:
         """Get the container of the parameter."""
         return self._iter_container
 
@@ -185,15 +183,15 @@ class IterableParam:
             raise TypeError("At this moment the number of references for IterableInputContainers cannot be retrieved.")
         return self._param.ref_counter(self._iter_container.index)
 
-    def connect(self, dst: Union["Param", "IterableParam"]) -> None:
+    def connect(self, dst: "Param" | "IterableParam") -> None:
         """Connect this parameter (output) with the dst (input) parameter."""
         self._param._connect(self, dst)
 
-    def __rshift__(self, rvalue: Union["Param", "IterableParam"]):
+    def __rshift__(self, rvalue: "Param" | "IterableParam"):
         """Allow to connect params using the >> operator."""
         self.connect(rvalue)
 
-    def disconnect(self, dst: Union["Param", "IterableParam"]) -> None:
+    def disconnect(self, dst: "Param" | "IterableParam") -> None:
         """Disconnect this parameter (output) with the dst (input) parameter."""
         self._param._disconnect(self, dst)
 
@@ -206,22 +204,25 @@ class Reference:
 
     """
     param: "Param"
-    index: Optional[int] = None
+    ori_param: "Param"  # added to avoid duplicated references, it is rare but it could happen.
+    index: None | int = None
+    ori_index: None | int = None  # added to avoid duplicated references, it is rare but it could happen.
     # allow to know if there is a new value for the parameter
-    sent: Optional[asyncio.Event] = None
+    sent: None | asyncio.Event = None
     # allow to know if the value has been consumed
-    consumed: Optional[asyncio.Event] = None
+    consumed: None | asyncio.Event = None
 
     def __hash__(self) -> int:
         # this method is required to be able to use Reference in a set.
         # Note that we don't use the consumed attribute in the hash since it is dynamic.
-        return hash((self.param, self.index))
+        return hash((self.param, self.index, self.ori_param, self.ori_index))
 
     def __eq__(self, other: Any) -> bool:
         # this method is required to be able to use Reference in a set.
         # Note that we don't use the consumed attribute in the hash since it is dynamic.
         if isinstance(other, Reference):
-            return self.param == other.param and self.index == other.index
+            return (self.param == other.param and self.index == other.index and
+                    self.ori_param == other.ori_param and self.ori_index == other.ori_index)
         return False
 
 
@@ -236,30 +237,43 @@ class Param:
         parent (optional): parent component. Default: None.
 
     """
-    def __init__(self, name: str, tp: Any = Any, value: Any = NoValue(), arg: Optional[str] = None,
-                 parent: Optional[Component] = None) -> None:
+    def __init__(self, name: str, tp: Any = Any, value: Any = NoValue(), arg: None | str = None,
+                 parent: None | Component = None) -> None:
         # validate that the type is coherent with the value
         if not isinstance(value, NoValue):
             typeguard.check_type(name, value, tp)
 
         self._name: str = name
         self._type: Any = tp
-        self._arg: Optional[str] = arg
+        self._arg: None | str = arg
         # We store all the references for each param.
         # The key is the slicing for the current param.
-        self._refs: Dict[Any, Set[Reference]] = defaultdict(set)
-        self._value: Union[Container, IterableContainer, IterableInputContainers] = Container(value)
+        self._refs: dict[Any, set[Reference]] = defaultdict(set)
+        self._value: Container | IterableContainer | IterableInputContainers = Container(value)
         # only sequences with tensors inside are subscriptable
         self._is_subscriptable = _check_subscriptable(tp)
-        self._parent: Optional[Component] = parent
+        self._parent: None | Component = parent
 
     @property
-    def parent(self) -> Optional[Component]:
+    def is_subscriptable(self) -> bool:
+        """Return if the parameter is subscriptable."""
+        return self._is_subscriptable
+
+    def reset_is_subscriptable(self) -> None:
+        """Reset the subscriptable flag."""
+        self._is_subscriptable = _check_subscriptable(self._type)
+
+    def set_as_non_subscriptable(self) -> None:
+        """Set the subscriptable flag to False."""
+        self._is_subscriptable = False
+
+    @property
+    def parent(self) -> None | Component:
         """Get the parent component."""
         return self._parent
 
     @property
-    def arg(self) -> Optional[str]:
+    def arg(self) -> None | str:
         """Get the argument related with the param."""
         return self._arg
 
@@ -274,9 +288,9 @@ class Param:
         return self._name
 
     @property
-    def references(self) -> Set[Reference]:
+    def references(self) -> set[Reference]:
         """Get all the references for the parameter."""
-        refs: Set[Reference] = set()
+        refs: set[Reference] = set()
         for ref_set in self._refs.values():
             refs = refs.union(ref_set)
         return refs
@@ -298,7 +312,7 @@ class Param:
             assert self._is_subscriptable
             origin = typing.get_origin(self._type)
             assert origin is not None
-            res_value: List[Any] = self._value.get_ordered()
+            res_value: list[Any] = self._value.get_ordered()
             return origin(res_value)
 
     @value.setter
@@ -317,19 +331,19 @@ class Param:
             value = value.value
         if not isinstance(self._value, Container):
             raise TypeError(f"Param '{self.name}' cannot be assigned.")
-        if isinstance(value, (Container, IterableContainer, Set)):
+        if isinstance(value, (Container, IterableContainer, set)):
             raise TypeError(
                 f"The type of the value to be assigned to param '{self.name}' cannot have a 'value' attribute.")
         typeguard.check_type(self._name, value, self._type)
         self._value.value = value
 
     @property
-    def container(self) -> Union[Container, IterableContainer, IterableInputContainers]:
+    def container(self) -> Container | IterableContainer | IterableInputContainers:
         """Get the container for this parameter."""
         return self._value
 
     @container.setter
-    def container(self, value: Union[Container, IterableContainer, IterableInputContainers]) -> None:
+    def container(self, value: Container | IterableContainer | IterableInputContainers) -> None:
         """Set the container for this parameter.
 
         Args:
@@ -338,7 +352,7 @@ class Param:
         """
         self._value = value
 
-    def ref_counter(self, index: Optional[int] = None) -> int:
+    def ref_counter(self, index: None | int = None) -> int:
         """Return the number of references for this parameter."""
         if index is not None:
             return len(self._refs[index])
@@ -361,7 +375,7 @@ class Param:
         # create a new param with the selected slice inside the param
         return IterableParam(self, index)
 
-    def _connect(self, ori: Union["Param", IterableParam], dst: Union["Param", IterableParam]) -> None:
+    def _connect(self, ori: "Param" | IterableParam, dst: "Param" | IterableParam) -> None:
         """Connect this parameter (output) with the dst (input) parameter."""
         # Disable this check until a better solution is found to connect 2 lists.
         # if isinstance(ori, Param) and ori._is_subscriptable:
@@ -370,7 +384,7 @@ class Param:
         # if isinstance(dst, Param) and dst._is_subscriptable:
         #    raise ValueError(f"The param '{dst.name}' must be connected using indexes.")
 
-        # NOTE that there are not type validation, we will trust in the user to connect params.
+        # NOTE that there is not type validation, we will trust in the user to connect params.
         # We only check when there is an explicit value in the ori param.
         if isinstance(ori, Param) and not isinstance(ori.value, NoValue):
             if isinstance(dst, Param):
@@ -419,15 +433,15 @@ class Param:
 
         self._update_references('add', ori, dst)
 
-    def connect(self, dst: Union["Param", IterableParam]) -> None:
+    def connect(self, dst: "Param" | IterableParam) -> None:
         """Connect this parameter (output) with the dst (input) parameter."""
         self._connect(self, dst)
 
-    def __rshift__(self, rvalue: Union["Param", IterableParam]):
+    def __rshift__(self, rvalue: "Param" | IterableParam):
         """Allow to connect params using the >> operator."""
         self.connect(rvalue)
 
-    def _disconnect(self, ori: Union["Param", IterableParam], dst: Union["Param", IterableParam]) -> None:
+    def _disconnect(self, ori: "Param" | IterableParam, dst: "Param" | IterableParam) -> None:
         """Disconnect this parameter from the dst parameter."""
         if isinstance(dst, Param):
             assert isinstance(dst.container, Container)
@@ -443,7 +457,7 @@ class Param:
 
         self._update_references('remove', ori, dst)
 
-    def _update_references(self, type: str, ori: Union["Param", IterableParam], dst: Union["Param", IterableParam]
+    def _update_references(self, type: str, ori: "Param" | IterableParam, dst: "Param" | IterableParam
                            ) -> None:
         # assign references
         ori_idx = None
@@ -459,13 +473,13 @@ class Param:
             # references of both params.
             consumed_event = asyncio.Event()
             sent_event = asyncio.Event()
-            ori._refs[ori_idx].add(Reference(dst, dst_idx, sent_event, consumed_event))
-            dst._refs[dst_idx].add(Reference(ori, ori_idx, sent_event, consumed_event))
+            ori._refs[ori_idx].add(Reference(dst, ori, dst_idx, ori_idx, sent_event, consumed_event))
+            dst._refs[dst_idx].add(Reference(ori, dst, ori_idx, dst_idx, sent_event, consumed_event))
         elif type == 'remove':
-            ori._refs[ori_idx].remove(Reference(dst, dst_idx))
-            dst._refs[dst_idx].remove(Reference(ori, ori_idx))
+            ori._refs[ori_idx].remove(Reference(dst, ori, dst_idx, ori_idx))
+            dst._refs[dst_idx].remove(Reference(ori, dst, ori_idx, dst_idx))
 
-    def disconnect(self, dst: Union["Param", IterableParam]) -> None:
+    def disconnect(self, dst: "Param" | IterableParam) -> None:
         """Disconnect this parameter (output) from the dst (input) parameter."""
         self._disconnect(self, dst)
 
@@ -476,6 +490,7 @@ class InputParam(Param):
     async def receive(self) -> Any:
         """Wait until the input param receives a value from the connected output param."""
         assert self._parent is not None
+        self._parent._Component__num_params_waiting_to_receive += 1
         if self.references:
             for ref in self.references:
                 # NOTE: each input param can be connected to 0 or 1 output param (N output params if it is iterable).
@@ -489,7 +504,7 @@ class InputParam(Param):
                                        f"{ori_param.parent.name}.{ori_param.name} -> {self._parent.name}.{self.name}")
                 async_utils.create_task_if_needed(self._parent, ori_param.parent)
 
-            if self._parent.stopping_iteration == 0:
+            if self._parent.stopping_execution == 0:
                 # fast way, in contrast with the while loop below, to wait for the input param.
                 # wait until all the output params send the values
                 await asyncio.gather(*[ref.sent.wait() for ref in self.references if ref.sent is not None])
@@ -513,8 +528,8 @@ class InputParam(Param):
                 assert ref.param is not None
                 assert ref.param.parent is not None
                 # if we want to stop at a given min iter then it is posible to require more iters
-                if ref.param.parent.state is not ComponentState.STOPPED_AT_ITER and ref.param.parent.is_stopped():
-                    raise ComponentStoppedError(ref.param.parent.state)
+                if ComponentState.STOPPED_AT_ITER not in ref.param.parent.state and ref.param.parent.is_stopped():
+                    raise ComponentStoppedError(ComponentState.STOPPED_BY_COMPONENT)
 
             for ref in self.references:
                 # NOTE: depending on how the value is consumed we should apply a copy here.
@@ -528,11 +543,19 @@ class InputParam(Param):
                 assert isinstance(ref.consumed, asyncio.Event)
                 ref.consumed.set()  # denote that the param is consumed
                 ref.sent.clear()  # allow to know to the sender that it can send again
-                self._parent.set_state(ComponentState.RUNNING)
-            return value
         else:
+            value = self.value
+        await self._are_all_waiting_params_received()
+        if self._parent.pipeline and self._parent.pipeline.param_received_user_hook:
+            await self._parent.pipeline.param_received_user_hook(self)
+        return value
+
+    async def _are_all_waiting_params_received(self) -> None:
+        """Check if the component is waiting for other params before changing the component state."""
+        assert self._parent is not None
+        self._parent._Component__num_params_waiting_to_receive -= 1
+        if self._parent._Component__num_params_waiting_to_receive == 0:
             self._parent.set_state(ComponentState.RUNNING)
-            return self.value
 
 
 class OutputParam(Param):
@@ -557,11 +580,14 @@ class OutputParam(Param):
                                    f"{self._parent.name}.{self.name} -> {dst_param.parent.name}.{dst_param.name}")
             async_utils.create_task_if_needed(self._parent, dst_param.parent)
 
+        if self._parent.pipeline and self._parent.pipeline.param_sent_user_hook:
+            await self._parent.pipeline.param_sent_user_hook(self)
+
         # wait until all the input params read the value
         await asyncio.gather(*[ref.consumed.wait() for ref in self.references if ref.consumed is not None])
         for ref in self.references:
             assert ref.param is not None
             assert ref.param.parent is not None
             # if we want to stop at a given min iter then it is posible to require more iters
-            if ref.param.parent.state is not ComponentState.STOPPED_AT_ITER and ref.param.parent.is_stopped():
-                raise ComponentStoppedError(ref.param.parent.state)
+            if ComponentState.STOPPED_AT_ITER not in ref.param.parent.state and ref.param.parent.is_stopped():
+                raise ComponentStoppedError(ComponentState.STOPPED_BY_COMPONENT)

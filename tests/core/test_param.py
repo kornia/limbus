@@ -116,7 +116,17 @@ class TestParam:
         assert p.references == set()
         assert p.arg is None
         assert p._is_subscriptable is False
+        assert p.is_subscriptable is False
         assert p() == p.value
+
+    def test_subcriptability(self):
+        p = Param("a", List[torch.Tensor], value=[torch.tensor(1), torch.tensor(1)])
+        assert p._is_subscriptable
+        assert p.is_subscriptable
+        p.set_as_non_subscriptable()
+        assert not p._is_subscriptable
+        p.reset_is_subscriptable()
+        assert p._is_subscriptable
 
     def test_init_with_type(self):
         p = Param("a", tp=int)
@@ -161,11 +171,20 @@ class TestParam:
     def test_select(self):
         p = Param("a", List[torch.Tensor], value=[torch.tensor(1), torch.tensor(1)])
         assert p._is_subscriptable
+        assert p.is_subscriptable
         iter_param = p.select(0)
         assert isinstance(iter_param, IterableParam)
         assert isinstance(iter_param.iter_container, IterableContainer)
         assert iter_param.iter_container.index == 0
         assert iter_param.iter_container.value == 1
+
+    def test_subscriptable(self):
+        p = Param("a", List[torch.Tensor], value=[torch.tensor(1), torch.tensor(1)])
+        assert p.is_subscriptable
+        p.set_as_non_subscriptable()
+        assert p.is_subscriptable is False
+        p.reset_is_subscriptable()
+        assert p.is_subscriptable
 
     def test_connect_iterparam_param_no_select_raise_error(self):
         p0 = Param("a", List[torch.Tensor])
@@ -203,12 +222,12 @@ class TestParam:
         p0.connect(p1)
         assert isinstance(p1.container, Container)
         assert p1.value == 1
-        assert p0.references == {Reference(p1)}
+        assert p0.references == {Reference(p1, ori_param=p0)}
         assert list(p0._refs.keys()) == [None]
-        assert list(p0._refs[None])[0] == Reference(p1)
-        assert p1.references == {Reference(p0)}
+        assert list(p0._refs[None])[0] == Reference(p1, ori_param=p0)
+        assert p1.references == {Reference(p0, ori_param=p1)}
         assert list(p1._refs.keys()) == [None]
-        assert list(p1._refs[None])[0] == Reference(p0)
+        assert list(p1._refs[None])[0] == Reference(p0, ori_param=p1)
 
     def test_disconnect_param_param(self):
         p0 = Param("a", value=1)
@@ -231,9 +250,9 @@ class TestParam:
         assert isinstance(p1.container, Container)
         assert p1.value == torch.tensor(2)
         assert list(p0._refs.keys()) == [1]
-        assert list(p0._refs[1])[0] == Reference(p1)
+        assert list(p0._refs[1])[0] == Reference(p1, ori_param=p0, ori_index=1)
         assert list(p1._refs.keys()) == [None]
-        assert list(p1._refs[None])[0] == Reference(p0, 1)
+        assert list(p1._refs[None])[0] == Reference(p0, p1, 1)
 
     def test_disconnect_iterparam_param(self):
         p0 = Param("a", tp=List[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
@@ -256,12 +275,12 @@ class TestParam:
         assert isinstance(p0.container, IterableInputContainers)
         assert p0.value == [torch.tensor(2), torch.tensor(1)]
         assert sorted(list(p0._refs.keys())) == sorted([0, 1])
-        assert list(p0._refs[0])[0] == Reference(p2)
-        assert list(p0._refs[1])[0] == Reference(p1)
+        assert list(p0._refs[0])[0] == Reference(p2, ori_param=p0, ori_index=0)
+        assert list(p0._refs[1])[0] == Reference(p1, ori_param=p0, ori_index=1)
         assert list(p1._refs.keys()) == [None]
-        assert list(p1._refs[None])[0] == Reference(p0, 1)
+        assert list(p1._refs[None])[0] == Reference(p0, p1, 1)
         assert list(p2._refs.keys()) == [None]
-        assert list(p2._refs[None])[0] == Reference(p0, 0)
+        assert list(p2._refs[None])[0] == Reference(p0, p2, 0)
 
     def test_disconnect_param_iterparam(self):
         p0 = Param("a", tp=List[torch.Tensor])
@@ -289,11 +308,11 @@ class TestParam:
         assert isinstance(p1.container, IterableInputContainers)
         assert p1.value == [torch.tensor(2), torch.tensor(1)]
         assert sorted(list(p0._refs.keys())) == sorted([0, 1])
-        assert list(p0._refs[0])[0] == Reference(p1, 1)
-        assert list(p0._refs[1])[0] == Reference(p1, 0)
+        assert list(p0._refs[0])[0] == Reference(p1, p0, 1, 0)
+        assert list(p0._refs[1])[0] == Reference(p1, p0, 0, 1)
         assert sorted(list(p1._refs.keys())) == sorted([0, 1])
-        assert list(p1._refs[0])[0] == Reference(p0, 1)
-        assert list(p1._refs[1])[0] == Reference(p0, 0)
+        assert list(p1._refs[0])[0] == Reference(p0, p1, 1, 0)
+        assert list(p1._refs[1])[0] == Reference(p0, p1, 0, 1)
 
     def test_disconnect_iterparam_iterparam(self):
         p0 = Param("a", tp=List[torch.Tensor], value=[torch.tensor(1), torch.tensor(2)])
@@ -392,7 +411,7 @@ class A(Component):
 class B(Component):
     def __init__(self, name):
         super().__init__(name)
-        self._stopping_iteration = 1
+        self.stopping_execution = 1
 
     async def forward(self) -> ComponentState:
         return ComponentState.OK
@@ -429,7 +448,7 @@ class TestInputParam:
         assert res == [None, 1]
         assert [ref.consumed.is_set() for ref in pi.references] == [True]
         assert [ref.sent.is_set() for ref in po.references] == [False]
-        assert pi.parent.counter == 1
+        assert pi.parent.executions_counter == 1
 
     async def test_receive_from_iterable_param(self):
         po0 = OutputParam("b", torch.Tensor, parent=A("b"))

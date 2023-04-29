@@ -2,11 +2,21 @@
 from __future__ import annotations
 import asyncio
 import inspect
-from typing import Coroutine, TYPE_CHECKING, Optional
+from typing import Coroutine, TYPE_CHECKING
 from sys import version_info
 
 if TYPE_CHECKING:
     from limbus.core.component import Component
+
+# Get the loop that is going to run the pipeline. Doing it in this way allows to rerun the pipeline.
+loop = asyncio.new_event_loop()
+
+
+def reset_loop() -> asyncio.AbstractEventLoop:
+    """Reset the loop."""
+    global loop
+    loop = asyncio.new_event_loop()
+    return loop
 
 
 def run_coroutine(coro: Coroutine) -> None:
@@ -16,25 +26,20 @@ def run_coroutine(coro: Coroutine) -> None:
         coro: coroutine to run.
 
     """
-    if version_info.major != 3:
-        raise ValueError("Only python 3 is supported.")
-    if version_info.minor < 10:
-        # for python <3.10 the loop must be run in this way to avoid creating a new loop.
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(coro)
-    elif version_info.minor >= 10:
-        # for python >=3.10 the loop should be run in this way.
-        asyncio.run(coro)
+    global loop
+    if loop.is_closed():
+        loop = reset_loop()
+    loop.run_until_complete(coro)
 
 
-def get_task_if_exists(component: Component) -> Optional[asyncio.Task]:
+def get_task_if_exists(component: Component) -> None | asyncio.Task:
     """Get the task associated to a given component if it exists.
 
     Args:
         component: component to check.
 
     Returns:
-        Optional[asyncio.Task]: task associated to the component if it exists, None otherwise.
+        None | asyncio.Task: task associated to the component if it exists, None otherwise.
 
     """
     task: asyncio.Task

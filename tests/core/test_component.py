@@ -9,14 +9,17 @@ class TestState:
     def test_smoke(self):
         cmp = Component("test")
         state = _ComponentState(cmp, ComponentState.RUNNING, True)
-        assert state.state == ComponentState.RUNNING
+        assert state.state == [ComponentState.RUNNING]
+        assert state.message(ComponentState.RUNNING) is None
         assert state.verbose is True
         assert state._component == cmp
 
     def test_call_no_params(self):
         cmp = Component("test")
         state = _ComponentState(cmp, ComponentState.RUNNING)
-        assert state() == ComponentState.RUNNING
+        assert state() == [ComponentState.RUNNING]
+        assert state.message(ComponentState.RUNNING) is None
+        assert state.verbose is False
 
     @pytest.mark.parametrize("verbose", [True, False])
     def test_call(self, caplog, verbose):
@@ -25,7 +28,8 @@ class TestState:
         state.verbose = verbose
         assert state.verbose == verbose
         with caplog.at_level(logging.INFO):
-            assert state(ComponentState.DISABLED, "message") == ComponentState.DISABLED
+            assert state(ComponentState.DISABLED, "message") == [ComponentState.DISABLED]
+            assert state.message(ComponentState.DISABLED) == "message"
             if verbose:
                 assert len(caplog.records) == 1
                 assert "message" in caplog.text
@@ -41,6 +45,17 @@ class TestComponent:
         assert cmp.inputs is not None
         assert cmp.outputs is not None
         assert cmp.properties is not None
+
+    def test_set_state(self):
+        cmp = Component("yuhu")
+        cmp.set_state(ComponentState.PAUSED)
+        cmp.state == ComponentState.PAUSED
+        cmp.state_message(ComponentState.PAUSED) is None
+        cmp.state_message(ComponentState.FORCED_STOP) is None
+        cmp.set_state(ComponentState.ERROR, "error")
+        cmp.state == ComponentState.ERROR
+        cmp.state_message(ComponentState.ERROR) == "error"
+        cmp.state_message(ComponentState.FORCED_STOP) is None
 
     def test_set_properties(self):
         class A(Component):
@@ -155,9 +170,9 @@ class TestComponentWithPipeline:
         pipeline = Pipeline()
         pipeline.add_nodes(cmp)
         pipeline.run(iters)
-        assert cmp.counter == 1
-        assert pipeline.counter == 1
-        assert cmp.stopping_iteration == iters
+        assert cmp.executions_counter == 1
+        assert pipeline.min_iteration_in_progress == 1
+        assert cmp.stopping_execution == iters
 
     def test_stop_after_exception(self):
         class A(Component):
@@ -168,9 +183,10 @@ class TestComponentWithPipeline:
         pipeline = Pipeline()
         pipeline.add_nodes(cmp)
         pipeline.run(2)
-        assert cmp.counter == 1
-        assert pipeline.counter == 1
-        assert cmp.state == ComponentState.ERROR
+        assert cmp.executions_counter == 1
+        assert pipeline.min_iteration_in_progress == 1
+        assert cmp.state == [ComponentState.ERROR]
+        assert cmp.state_message(ComponentState.ERROR) == "Exception - test"
 
     def test_stop_after_stop(self):
         class A(Component):
@@ -181,6 +197,7 @@ class TestComponentWithPipeline:
         pipeline = Pipeline()
         pipeline.add_nodes(cmp)
         pipeline.run(2)
-        assert cmp.counter == 1
-        assert pipeline.counter == 1
-        assert cmp.state == ComponentState.STOPPED
+        assert cmp.executions_counter == 1
+        assert pipeline.min_iteration_in_progress == 1
+        assert cmp.state == [ComponentState.STOPPED]
+        assert cmp.state_message(ComponentState.STOPPED) is None
