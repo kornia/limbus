@@ -59,6 +59,7 @@ class TestComponent:
 
     def test_register_properties(self):
         class A(Component):
+            @staticmethod
             def register_properties(properties):
                 Component.register_properties(properties)
                 properties.declare("a", float, 1.)

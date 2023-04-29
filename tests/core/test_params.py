@@ -25,19 +25,18 @@ class TestParams:
         p = TParams()
         p.declare("x")
         assert isinstance(p.x.value, NoValue)
-        assert isinstance(p.get_param("x"), NoValue)
+        assert isinstance(p["x"].value, NoValue)
 
         p.declare("y", float, 1.)
         assert p.y.value == 1.
         assert p["y"].value == 1.
-        assert p.get_param("y") == 1.
         assert isinstance(p["y"], Param)
         assert isinstance(p.y, Param)
         assert isinstance(p["y"].value, float)
         assert p["y"].type == float
         assert p["y"].name == "y"
         assert p["y"].arg is None
-        assert p.get_related_arg("y") is None
+        assert p.y.arg is None
 
     def test_tensor(self):
         p1 = TParams()
@@ -49,16 +48,16 @@ class TestParams:
         p2.declare("y", torch.Tensor, p1.x)
         assert p1.x.value == p2.y.value
 
-    def test_get_param(self):
+    def test_get_params(self):
         p = TParams()
         p.declare("x")
         p.declare("y", float, 1.)
         assert len(p) == 2
         assert p.get_params() == ["x", "y"]
-        assert isinstance(p.get_param("x"), NoValue)
-        assert p.get_param("y") == 1.
-        p.set_param("x", "xyz")
-        assert p.get_param("x") == "xyz"
+        assert isinstance(p.x.value, NoValue)
+        assert p.y.value == 1.
+        p.x.value = "xyz"
+        assert p.x.value == "xyz"
 
     def test_wrong_set_param_type(self):
         p = TParams()
@@ -66,15 +65,7 @@ class TestParams:
             p.declare("x", int, 1.)
         p.declare("x", int)
         with pytest.raises(TypeError):
-            p.set_param("x", "xyz")
-
-    def test_get_type(self):
-        p = TParams()
-        p.declare("x")
-        p.declare("y", float, 1.)
-        assert p.get_type("x") == Any
-        assert p.get_type("y") == float
-        assert p.get_types() == {"x": Any, "y": float}
+            p.x.value = "xyz"
 
 
 class TestInputParams:
@@ -99,7 +90,7 @@ class TestOutputParams:
         assert p.z is None  # Intellisense asumes p.z exist as an OutputParam
 
 
-class TestPropParams:
+class TestPropertyParams:
     def test_declare(self):
         p = PropertyParams()
         p.declare("x", float, 1.)

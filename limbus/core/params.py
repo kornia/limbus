@@ -21,15 +21,6 @@ class Params(Iterable, ABC):
         """Add or modify a param."""
         raise NotImplementedError
 
-    def get_related_arg(self, name: str) -> None | str:
-        """Return the argument in the Component constructor related with a given param.
-
-        Args:
-            name: name of the param.
-
-        """
-        return getattr(self, name).arg
-
     def get_params(self, only_connected: bool = False) -> list[str]:
         """Return the name of all the params.
 
@@ -44,42 +35,8 @@ class Params(Iterable, ABC):
                 params.append(name)
         return params
 
-    def get_types(self) -> dict[str, type]:
-        """Return the name and the type of all the params."""
-        types: dict[str, type] = {
-            name: getattr(self, name).type for name in self.__dict__ if not name.startswith('_')}
-        return types
-
-    def get_type(self, name: str) -> type:
-        """Return the type of a given param.
-
-        Args:
-            name: name of the param.
-
-        """
-        return getattr(self, name).type
-
-    def get_param(self, name: str) -> Any:
-        """Return the param value.
-
-        Args:
-            name: name of the param.
-
-        """
-        return getattr(self, name).value
-
     def __len__(self) -> int:
         return len(self.get_params())
-
-    def set_param(self, name: str, value: Any) -> None:
-        """Set the param value.
-
-        Args:
-            name: name of the param.
-            value: value to be setted.
-
-        """
-        getattr(self, name).value = value
 
     def __getitem__(self, name: str) -> Param:
         return getattr(self, name)
