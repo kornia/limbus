@@ -101,14 +101,14 @@ class TestComponent:
         class A(Component):
             @staticmethod
             def register_outputs(outputs):
-                outputs.declare("a", float, 1.)
-                outputs.declare("b", float, 2.)
+                outputs.declare("a", float)
+                outputs.declare("b", float)
 
         cmp = A("yuhu")
         assert len(cmp.inputs) == 0
         assert len(cmp.outputs) == 2
-        assert cmp.outputs.a.value == 1.
-        assert cmp.outputs.b.value == 2.
+        assert cmp.outputs.a.type is float
+        assert cmp.outputs.b.type is float
 
     def test_init_from_component(self):
         class A(Component):

@@ -5,7 +5,7 @@ from typing import Callable
 from enum import Enum
 
 from limbus import widgets
-from limbus.core import Component, ComponentState, PropParams
+from limbus.core import Component, ComponentState, PropertyParams
 
 
 class WidgetState(Enum):
@@ -65,7 +65,7 @@ class BaseWidgetComponent(WidgetComponent):
     WIDGET_STATE: WidgetState = WidgetState.ENABLED
 
     @staticmethod
-    def register_properties(properties: PropParams) -> None:
+    def register_properties(properties: PropertyParams) -> None:
         """Register the properties.
 
         Args:

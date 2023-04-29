@@ -487,7 +487,7 @@ class Param(ABC):
         self._disconnect(self, dst)
 
 
-class PropParam(Param):
+class PropertyParam(Param):
     """Class to manage the comunication for each property parameter."""
 
     async def set_property(self, value: Any) -> None:

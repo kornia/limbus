@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 # Note that Component class cannot be imported to avoid circular dependencies.
 # Since it is only used for type hints we import the module and use "component.Component" for typing.
 from limbus.core import component
-from limbus.core.param import Param, NoValue, InputParam, OutputParam, PropParam
+from limbus.core.param import Param, NoValue, InputParam, OutputParam, PropertyParam
 
 
 class Params(Iterable, ABC):
@@ -16,11 +16,11 @@ class Params(Iterable, ABC):
         super().__init__()
         self._parent = parent_component
 
-
     @abstractmethod
     def declare(self, *args, **kwargs) -> None:
         """Add or modify a param."""
         raise NotImplementedError
+
     def get_related_arg(self, name: str) -> None | str:
         """Return the argument in the Component constructor related with a given param.
 
@@ -125,7 +125,7 @@ class InputParams(Params):
         ...
 
 
-class PropParams(Params):
+class PropertyParams(Params):
     """Class to manage property parameters."""
 
     def declare(self, name: str, tp: Any = Any, value: Any = NoValue(), callback: Callable | None = None) -> None:
@@ -140,9 +140,9 @@ class PropParams(Params):
         """
         if isinstance(value, Param):
             value = value.value
-        setattr(self, name, PropParam(name, tp, value, None, self._parent, callback))
+        setattr(self, name, PropertyParam(name, tp, value, None, self._parent, callback))
 
-    def __getattr__(self, name: str) -> PropParam:  # type: ignore  # it should return an InitParam
+    def __getattr__(self, name: str) -> PropertyParam:  # type: ignore  # it should return an PropParam
         """Trick to avoid mypy issues with dinamyc attributes."""
         ...
 

@@ -14,7 +14,7 @@ except ImportError:
     pass
 
 from limbus_config import config
-from limbus.core.params import InputParams, OutputParams, PropParams
+from limbus.core.params import InputParams, OutputParams, PropertyParams
 from limbus.core.states import ComponentState, ComponentStoppedError
 # Note that Pipeline class cannot be imported to avoid circular dependencies.
 if TYPE_CHECKING:
@@ -143,7 +143,7 @@ class Component(base_class):
         self.__class__.register_inputs(self._inputs)
         self._outputs = OutputParams(self)
         self.__class__.register_outputs(self._outputs)
-        self._properties = PropParams(self)
+        self._properties = PropertyParams(self)
         self.__class__.register_properties(self._properties)
         self.__state: _ComponentState = _ComponentState(self, ComponentState.INITIALIZED)
         self.__pipeline: None | Pipeline = None
@@ -249,7 +249,7 @@ class Component(base_class):
         return self._outputs
 
     @property
-    def properties(self) -> PropParams:
+    def properties(self) -> PropertyParams:
         """Get the set of properties for this component."""
         return self._properties
 
@@ -274,7 +274,7 @@ class Component(base_class):
         pass
 
     @staticmethod
-    def register_properties(properties: PropParams) -> None:
+    def register_properties(properties: PropertyParams) -> None:
         """Register the properties.
 
         These params are optional.
