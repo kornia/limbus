@@ -277,7 +277,11 @@ class Param(ABC):
 
     @property
     def arg(self) -> None | str:
-        """Get the argument related with the param."""
+        """Get the argument in the Component constructor related with this param.
+
+        This is a trick to pass a value and type of an argument in the Component constructor to this parameter.
+
+        """
         return self._arg
 
     @property
