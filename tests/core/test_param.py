@@ -1,13 +1,16 @@
 import pytest
 from typing import Any, List, Sequence, Iterable, Tuple
 import asyncio
+import logging
 
 import torch
 
 import limbus.core.param
 from limbus.core import NoValue, Component, ComponentState
-from limbus.core.param import (Container, Param, InputParam, OutputParam,
+from limbus.core.param import (Container, Param, InputParam, OutputParam, PropertyParam,
                                IterableContainer, IterableInputContainers, IterableParam, Reference)
+
+log = logging.getLogger(__name__)
 
 
 class TestContainer:
@@ -479,6 +482,20 @@ class TestInputParam:
         assert list(pi._refs[1])[0].sent.is_set() is False
         assert pi.value == [torch.tensor(2), torch.tensor(1)]
 
+    async def test_receive_with_callback(self, caplog):
+        async def callback(self, value):
+            assert self.name == "a"
+            log.info(f"callback: {value}")
+            return 2
+        po = OutputParam("b", parent=A("b"))
+        pi = InputParam("a", parent=A("a"), callback=callback)
+        po >> pi
+        with caplog.at_level(logging.INFO):
+            res = await asyncio.gather(po.send(1), pi.receive())
+            assert pi.value == 1  # the callback does not change the internal param value
+            assert res[1] == 2  # onl changes the return value
+            assert "callback: 1" in caplog.text
+
 
 class TestOutputParam:
     def test_smoke(self):
@@ -532,3 +549,53 @@ class TestOutputParam:
         assert list(po._refs[1])[0].sent.is_set() is False
         assert pi0.value == torch.tensor(1)
         assert pi1.value == torch.tensor(2)
+
+    async def test_send_with_callback(self, caplog):
+        async def callback(self, value):
+            assert self.name == "b"
+            log.info(f"callback: {value}")
+            return 2
+        po = OutputParam("b", parent=A("b"), callback=callback)
+        pi = InputParam("a", parent=A("a"))
+        po >> pi
+        with caplog.at_level(logging.INFO):
+            await asyncio.gather(po.send(1), pi.receive())
+            assert pi.value == 2
+            assert "callback: 1" in caplog.text
+
+
+class TestPropertyParam:
+    def test_smoke(self):
+        p = PropertyParam("a")
+        assert isinstance(p, Param)
+
+    def test_init_without_parent(self):
+        p = PropertyParam("a")
+        p.init_property(1)
+        assert p.value == 1
+
+    def test_init_with_parent(self):
+        p = PropertyParam("a", parent=A("b"))
+        p.init_property(1)
+        assert p.value == 1
+
+    async def test_set_without_parent(self):
+        p = PropertyParam("a")
+        with pytest.raises(AssertionError):
+            await p.set_property(1)
+
+    async def test_set_property_with_parent(self):
+        p = PropertyParam("b", parent=A("b"))
+        await p.set_property(1)
+        assert p.value == 1
+
+    async def test_set_property_with_callback(self, caplog):
+        async def callback(self, value):
+            assert self.name == "b"
+            log.info(f"callback: {value}")
+            return 2
+        p = PropertyParam("b", parent=A("b"), callback=callback)
+        with caplog.at_level(logging.INFO):
+            await p.set_property(1)
+            assert p.value == 2
+            assert "callback: 1" in caplog.text

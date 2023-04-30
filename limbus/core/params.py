@@ -69,8 +69,10 @@ class InputParams(Params):
             name: name of the parameter.
             tp: type (e.g. str, int, list, str | int,...). Default: typing.Any
             value (optional): value for the parameter. Default: NoValue().
-
-            callback (optional): callback function to be called when the parameter value changes. Default: None.
+            callback (optional): async callback function to be called when the parameter value changes.
+                Prototype: `async def callback(parent: Component, value: TYPE) -> TYPE:`
+                    - MUST return the value to be finally used.
+                Default: None.
 
         """
         if isinstance(value, Param):
@@ -92,7 +94,10 @@ class PropertyParams(Params):
             name: name of the parameter.
             tp: type (e.g. str, int, list, str | int,...). Default: typing.Any
             value (optional): value for the parameter. Default: NoValue().
-            callback (optional): callback function to be called when the parameter value changes. Default: None.
+            callback (optional): async callback function to be called when the parameter value changes.
+                Prototype: `async def callback(parent: Component, value: TYPE) -> TYPE:`
+                    - MUST return the value to be finally used.
+                Default: None.
 
         """
         if isinstance(value, Param):
@@ -114,9 +119,12 @@ class OutputParams(Params):
             name: name of the parameter.
             tp: type (e.g. str, int, list, str | int,...). Default: typing.Any
             arg (optional): Component argument directly related with the value of the parameter. Default: None.
-                            E.g. this is useful to propagate datatypes and values from a pin with a default value to
-                            an argument in a Component (GUI).
-            callback (optional): callback function to be called when the parameter value changes. Default: None.
+                E.g. this is useful to propagate datatypes and values from a pin with a default value to an argument
+                in a Component (GUI).
+            callback (optional): async callback function to be called when the parameter value changes.
+                Prototype: `async def callback(parent: Component, value: TYPE) -> TYPE:`
+                    - MUST return the value to be finally used.
+                Default: None.
 
         """
         setattr(self, name, OutputParam(name, tp, NoValue(), arg, self._parent, callback))

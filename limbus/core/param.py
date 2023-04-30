@@ -236,7 +236,10 @@ class Param(ABC):
         value (optional): value of the parameter. Default: NoValue().
         arg (optional): name of the argument in the component constructor related with this param. Default: None.
         parent (optional): parent component. Default: None.
-        callback (optional): callback to be called when the value of the parameter changes. Default: None.
+        callback (optional): async callback to be called when the value of the parameter changes.
+            Prototype: `async def callback(parent: Component, value: TYPE) -> TYPE:`
+                - MUST return the value to be finally used.
+            Default: None.
 
     """
     def __init__(self, name: str, tp: Any = Any, value: Any = NoValue(), arg: None | str = None,
@@ -497,8 +500,8 @@ class PropertyParam(Param):
         So, it is not running the callback function.
 
         """
-        assert self._parent is not None
-        if self._parent.executions_counter > 0:
+        # ComponentState.INITIALIZED means that the component was just created
+        if self._parent is not None and ComponentState.INITIALIZED not in self._parent.state:
             raise RuntimeError("The property can only be initialized before running the component.")
         self.value = value
 
@@ -512,7 +515,7 @@ class PropertyParam(Param):
         if self._callback is None:
             self.value = value
         else:
-            self.value = await self._callback(self._parent, self.value)
+            self.value = await self._callback(self._parent, value)
 
 
 class InputParam(Param):
@@ -522,6 +525,9 @@ class InputParam(Param):
         """Wait until the input param receives a value from the connected output param.
 
         Note that using this metohd will run the callback function as soon as a new value is received.
+        Note tha the callback changes teh result returned by the received method, not the value inside the
+            param (Param.value). This is in this way because the param can be shared between several input params,
+            so each callback call could change its value.
 
         """
         assert self._parent is not None
