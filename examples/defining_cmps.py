@@ -6,8 +6,8 @@ import asyncio
 from limbus_config import config
 config.COMPONENT_TYPE = "torch"
 
-from limbus.core import Component, InputParams, OutputParams, ComponentState, OutputParam, InputParam  # noqa: E402
-from limbus.core import Pipeline, VerboseMode  # noqa: E402
+from limbus.core import (Component, InputParams, OutputParams, PropertyParams, Pipeline, VerboseMode,  # noqa: E402
+                         ComponentState, OutputParam, InputParam, async_utils)  # noqa: E402
 
 
 # define the components
@@ -114,6 +114,18 @@ class Acc(Component):
         super().__init__(name)
         self._elements: int = elements
 
+    async def set_elements(self, value: int) -> int:  # noqa: D102
+        print(f"CALLBACK: Acc.elements: {value}.")
+        # this is a bir tricky since the value is stored in 2 places the property and the variable.
+        # Since the acc uses the _elements variable in the forward method we need to update it here
+        # as well. Thanks to the callback we do not need to worry about both sources.
+        self._elements = value
+        return value
+
+    @staticmethod
+    def register_properties(properties: PropertyParams) -> None:  # noqa: D102
+        properties.declare("elements", int, callback=Acc.set_elements)
+
     @staticmethod
     def register_inputs(inputs: InputParams) -> None:  # noqa: D102
         inputs.declare("inp", int)
@@ -159,5 +171,12 @@ engine: Pipeline = Pipeline()
 engine.add_nodes([add, printer0])
 # there are several states for each component, with this verbose mode we can see them
 engine.set_verbose_mode(VerboseMode.COMPONENT)
-# run all teh components at least once (since there is an accumulator, some components will be run more than once)
-engine.run(1)
+# run all the components at least 2 times (since there is an accumulator, some components will be run more than once)
+
+
+async def run() -> None:  # noqa: D103
+    await engine.async_run(1)
+    await acc.properties.elements.set_property(3)  # change the number of elements to accumulate
+    await engine.async_run(1)
+
+async_utils.run_coroutine(run())
