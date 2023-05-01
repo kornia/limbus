@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import inspect
 from typing import Coroutine, TYPE_CHECKING
-from sys import version_info
 
 if TYPE_CHECKING:
     from limbus.core.component import Component

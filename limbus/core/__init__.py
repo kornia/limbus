@@ -1,7 +1,7 @@
 from limbus.core.component import Component, executions_manager
 from limbus.core.states import ComponentState, PipelineState, VerboseMode
-from limbus.core.param import NoValue, Param, Reference, InputParam, OutputParam
-from limbus.core.params import Params, InputParams, OutputParams
+from limbus.core.param import NoValue, Reference, InputParam, OutputParam, PropertyParam
+from limbus.core.params import PropertyParams, InputParams, OutputParams
 from limbus.core.pipeline import Pipeline
 from limbus.core.app import App
 
@@ -14,11 +14,11 @@ __all__ = [
     "Component",
     "executions_manager",
     "ComponentState",
-    "Params",
     "Reference",
+    "PropertyParams",
     "InputParams",
     "OutputParams",
+    "PropertyParam",
     "InputParam",
     "OutputParam",
-    "Param",
     "NoValue"]

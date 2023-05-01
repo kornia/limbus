@@ -57,7 +57,7 @@ class TestComponent:
         cmp.state_message(ComponentState.ERROR) == "error"
         cmp.state_message(ComponentState.FORCED_STOP) is None
 
-    def test_set_properties(self):
+    def test_register_properties(self):
         class A(Component):
             @staticmethod
             def register_properties(properties):
@@ -66,23 +66,11 @@ class TestComponent:
                 properties.declare("b", float, 2.)
 
         cmp = A("yuhu")
-        assert cmp.properties.get_param("a") == 1.
-        assert cmp.properties.get_param("b") == 2.
-        assert cmp.properties.a() == 1.
-        assert cmp.properties.b() == 2.
-        cmp.properties.set_param("a", 3.)
-        assert cmp.properties.get_param("a") == 3.
-        assert cmp.set_properties(a=4., b=5.)
-        assert cmp.properties.get_param("a") == 4.
-        assert cmp.properties.get_param("b") == 5.
-        assert cmp.set_properties(c=4.) is False
-        p = cmp.properties.get_params()
-        assert len(p) == 2
-        assert p[0] in ["a", "b"]
-        assert p[1] in ["a", "b"]
-        p = cmp.properties.get_types()
-        assert p["a"] == float
-        assert p["b"] == float
+        assert len(cmp.properties) == 2
+        assert len(cmp.inputs) == 0
+        assert len(cmp.outputs) == 0
+        assert cmp.properties.a.value == 1.
+        assert cmp.properties.b.value == 2.
 
     def test_register_inputs(self):
         class A(Component):
@@ -92,6 +80,7 @@ class TestComponent:
                 inputs.declare("b", float, 2.)
 
         cmp = A("yuhu")
+        assert len(cmp.properties) == 0
         assert len(cmp.outputs) == 0
         assert len(cmp.inputs) == 2
         assert cmp.inputs.a.value == 1.
@@ -101,14 +90,15 @@ class TestComponent:
         class A(Component):
             @staticmethod
             def register_outputs(outputs):
-                outputs.declare("a", float, 1.)
-                outputs.declare("b", float, 2.)
+                outputs.declare("a", float)
+                outputs.declare("b", float)
 
         cmp = A("yuhu")
+        assert len(cmp.properties) == 0
         assert len(cmp.inputs) == 0
         assert len(cmp.outputs) == 2
-        assert cmp.outputs.a.value == 1.
-        assert cmp.outputs.b.value == 2.
+        assert cmp.outputs.a.type is float
+        assert cmp.outputs.b.type is float
 
     def test_init_from_component(self):
         class A(Component):

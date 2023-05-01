@@ -3,11 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from collections import defaultdict
 import typing
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, Callable
 import inspect
 import collections
 import asyncio
 import contextlib
+from abc import ABC
 
 import typeguard
 
@@ -226,8 +227,8 @@ class Reference:
         return False
 
 
-class Param:
-    """Class to store data for each parameter.
+class Param(ABC):
+    """Base class to store data for each parameter.
 
     Args:
         name: name of the parameter.
@@ -235,10 +236,14 @@ class Param:
         value (optional): value of the parameter. Default: NoValue().
         arg (optional): name of the argument in the component constructor related with this param. Default: None.
         parent (optional): parent component. Default: None.
+        callback (optional): async callback to be called when the value of the parameter changes.
+            Prototype: `async def callback(parent: Component, value: TYPE) -> TYPE:`
+                - MUST return the value to be finally used.
+            Default: None.
 
     """
     def __init__(self, name: str, tp: Any = Any, value: Any = NoValue(), arg: None | str = None,
-                 parent: None | Component = None) -> None:
+                 parent: None | Component = None, callback: Callable | None = None) -> None:
         # validate that the type is coherent with the value
         if not isinstance(value, NoValue):
             typeguard.check_type(name, value, tp)
@@ -253,6 +258,7 @@ class Param:
         # only sequences with tensors inside are subscriptable
         self._is_subscriptable = _check_subscriptable(tp)
         self._parent: None | Component = parent
+        self._callback: None | Callable = callback
 
     @property
     def is_subscriptable(self) -> bool:
@@ -274,7 +280,11 @@ class Param:
 
     @property
     def arg(self) -> None | str:
-        """Get the argument related with the param."""
+        """Get the argument in the Component constructor related with this param.
+
+        This is a trick to pass a value and type of an argument in the Component constructor to this parameter.
+
+        """
         return self._arg
 
     @property
@@ -294,10 +304,6 @@ class Param:
         for ref_set in self._refs.values():
             refs = refs.union(ref_set)
         return refs
-
-    def __call__(self) -> Any:
-        """Get the value of the parameter."""
-        return self.value
 
     @property
     def value(self) -> Any:
@@ -484,11 +490,46 @@ class Param:
         self._disconnect(self, dst)
 
 
+class PropertyParam(Param):
+    """Class to manage the comunication for each property parameter."""
+
+    def init_property(self, value: Any) -> None:
+        """Initialize the property with the given value.
+
+        This method should be called before running the component to init the property.
+        So, it is not running the callback function.
+
+        """
+        # ComponentState.INITIALIZED means that the component was just created
+        if self._parent is not None and ComponentState.INITIALIZED not in self._parent.state:
+            raise RuntimeError("The property can only be initialized before running the component.")
+        self.value = value
+
+    async def set_property(self, value: Any) -> None:
+        """Set the value of the property.
+
+        Note: using this method is the only way to run the callback function.
+
+        """
+        assert self._parent is not None
+        if self._callback is None:
+            self.value = value
+        else:
+            self.value = await self._callback(self._parent, value)
+
+
 class InputParam(Param):
     """Class to manage the comunication for each input parameter."""
 
     async def receive(self) -> Any:
-        """Wait until the input param receives a value from the connected output param."""
+        """Wait until the input param receives a value from the connected output param.
+
+        Note that using this metohd will run the callback function as soon as a new value is received.
+        Note tha the callback changes teh result returned by the received method, not the value inside the
+            param (Param.value). This is in this way because the param can be shared between several input params,
+            so each callback call could change its value.
+
+        """
         assert self._parent is not None
         self._parent._Component__num_params_waiting_to_receive += 1
         if self.references:
@@ -545,8 +586,12 @@ class InputParam(Param):
                 ref.sent.clear()  # allow to know to the sender that it can send again
         else:
             value = self.value
+        if self._callback is not None:
+            # specific callback for this param
+            value = await self._callback(self._parent, value)
         await self._are_all_waiting_params_received()
         if self._parent.pipeline and self._parent.pipeline.param_received_user_hook:
+            # hook from the pipeline, all the components and input params run the same code
             await self._parent.pipeline.param_received_user_hook(self)
         return value
 
@@ -562,9 +607,17 @@ class OutputParam(Param):
     """Class to manage the comunication for each output parameter."""
 
     async def send(self, value: Any) -> None:
-        """Send the value of this param to the connected input params."""
+        """Send the value of this param to the connected input params.
+
+        Note that using this metohd will run the callback function as soon as a new value is received.
+
+        """
         assert self._parent is not None
-        self.value = value  # set the value for the param
+        if self._callback is None:
+            self.value = value  # set the value for the param
+        else:
+            self.value = await self._callback(self._parent, value)
+
         for ref in self.references:
             assert isinstance(ref.sent, asyncio.Event)
             assert isinstance(ref.consumed, asyncio.Event)

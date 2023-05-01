@@ -5,7 +5,7 @@ from typing import Callable
 from enum import Enum
 
 from limbus import widgets
-from limbus.core import Component, ComponentState, Params
+from limbus.core import Component, ComponentState, PropertyParams
 
 
 class WidgetState(Enum):
@@ -65,11 +65,11 @@ class BaseWidgetComponent(WidgetComponent):
     WIDGET_STATE: WidgetState = WidgetState.ENABLED
 
     @staticmethod
-    def register_properties(properties: Params) -> None:
+    def register_properties(properties: PropertyParams) -> None:
         """Register the properties.
 
         Args:
-             properties: Params object to register the properties.
+             properties: object to register the properties.
 
         """
         # this line is like super() but for static methods.
@@ -81,12 +81,12 @@ class BaseWidgetComponent(WidgetComponent):
         """Show the data.
 
         Args:
-            title: same as self._properties.get_param("title").
+            title: same as self._properties[]"title"].value.
 
         """
         raise NotImplementedError
 
     @is_disabled
     async def forward(self) -> ComponentState:  # noqa: D102
-        await self._show(self._properties.get_param("title"))
+        await self._show(self._properties["title"].value)
         return ComponentState.OK
