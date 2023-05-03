@@ -644,3 +644,52 @@ class OutputParam(Param):
             # if we want to stop at a given min iter then it is posible to require more iters
             if ComponentState.STOPPED_AT_ITER not in ref.param.parent.state and ref.param.parent.is_stopped():
                 raise ComponentStoppedError(ComponentState.STOPPED_BY_COMPONENT)
+
+
+class InputEvent(Param):
+    """Class to manage the comunication for each input event."""
+
+    async def receive(self) -> None:
+        """Wait until the input event is recveived."""
+        assert self._parent is not None
+        if self.references:
+            for ref in self.references:
+                # ensure the component related with the output event exists
+                assert ref.param is not None
+                ori_param: Param = ref.param
+                assert isinstance(ori_param, OutputEvent)  # they must be of type OutputEvent
+                assert ori_param.parent is not None
+                self._parent.set_state(ComponentState.RECEIVING_EVENTS,
+                                       f"{ori_param.parent.name}.{ori_param.name} -> {self._parent.name}.{self.name}")
+                async_utils.create_task_if_needed(self._parent, ori_param.parent)
+            await asyncio.wait(
+                [asyncio.ensure_future(ref.sent.wait()) for ref in self.references if ref.sent is not None],
+                return_when=asyncio.FIRST_COMPLETED)
+            # reser all the events
+            for ref in self.references:
+                assert isinstance(ref.sent, asyncio.Event)
+                ref.sent.clear()  # allow to know to the sender that it can send again
+            # exec the callback
+            if self._callback is not None:
+                await self._callback(self._parent)
+
+
+class OutputEvent(Param):
+    """Class to manage the comunication for each output event."""
+
+    async def send(self) -> None:
+        """Send an event to the connected input events."""
+        assert self._parent is not None
+        for ref in self.references:
+            assert isinstance(ref.sent, asyncio.Event)
+            assert isinstance(ref.consumed, asyncio.Event)
+            ref.sent.set()  # denote that the event was fired
+
+            # ensure the component related with the input event exists
+            assert ref.param is not None
+            dst_param: Param = ref.param
+            assert isinstance(dst_param, InputEvent)  # they must be of type InputEvent
+            assert dst_param.parent is not None
+            self._parent.set_state(ComponentState.SENDING_EVENTS,
+                                   f"{self._parent.name}.{self.name} -> {dst_param.parent.name}.{dst_param.name}")
+            async_utils.create_task_if_needed(self._parent, dst_param.parent)

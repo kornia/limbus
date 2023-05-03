@@ -14,7 +14,7 @@ except ImportError:
     pass
 
 from limbus_config import config
-from limbus.core.params import InputParams, OutputParams, PropertyParams
+from limbus.core.params import InputParams, OutputParams, PropertyParams, InputEvents, OutputEvents
 from limbus.core.states import ComponentState, ComponentStoppedError
 # Note that Pipeline class cannot be imported to avoid circular dependencies.
 if TYPE_CHECKING:
@@ -145,6 +145,10 @@ class Component(base_class):
         self.__class__.register_outputs(self._outputs)
         self._properties = PropertyParams(self)
         self.__class__.register_properties(self._properties)
+        self._input_events = InputEvents(self)
+        self.__class__.register_input_events(self._input_events)
+        self._output_events = OutputEvents(self)
+        self.__class__.register_output_events(self._output_events)
         self.__state: _ComponentState = _ComponentState(self, ComponentState.INITIALIZED)
         self.__pipeline: None | Pipeline = None
         self.__exec_counter: int = 0  # Counter of executions.
@@ -281,6 +285,26 @@ class Component(base_class):
 
         Args:
             properties: object to register the properties.
+
+        """
+        pass
+
+    @staticmethod
+    def register_input_events(inputs: InputEvents) -> None:
+        """Register the input events.
+
+        Args:
+            inputs: object to register the input events.
+
+        """
+        pass
+
+    @staticmethod
+    def register_output_events(outputs: OutputEvents) -> None:
+        """Register the output events.
+
+        Args:
+            outputs: object to register the output events.
 
         """
         pass

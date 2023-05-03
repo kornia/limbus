@@ -39,6 +39,8 @@ class ComponentState(Enum):
     STOPPED_AT_ITER = 10  # when the stop is because of the iteration number
     READY = 11  # when the component is ready to be executed at the beginning of each iteration
     STOPPED_BY_COMPONENT = 12  # when the stop is because another component forces it
+    RECEIVING_EVENTS = 13
+    SENDING_EVENTS = 14
 
 
 class PipelineState(Enum):

@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 # Note that Component class cannot be imported to avoid circular dependencies.
 # Since it is only used for type hints we import the module and use "component.Component" for typing.
 from limbus.core import component
-from limbus.core.param import Param, NoValue, InputParam, OutputParam, PropertyParam
+from limbus.core.param import Param, NoValue, InputParam, OutputParam, PropertyParam, InputEvent, OutputEvent
 
 
 class Params(Iterable, ABC):
@@ -130,5 +130,41 @@ class OutputParams(Params):
         setattr(self, name, OutputParam(name, tp, NoValue(), arg, self._parent, callback))
 
     def __getattr__(self, name: str) -> OutputParam:  # type: ignore  # it should return an OutputParam
+        """Trick to avoid mypy issues with dinamyc attributes."""
+        ...
+
+
+class InputEvents(Params):
+    """Class to manage input events."""
+
+    def declare(self, name: str, callback: Callable | None = None) -> None:
+        """Add or modify an input event.
+
+        Args:
+            name: name of the parameter.
+            callback: async callback function to be called when the event is received.
+                Prototype: `async def callback(parent: Component) -> None:`
+
+        """
+        setattr(self, name, InputEvent(name, parent=self._parent, callback=callback))
+
+    def __getattr__(self, name: str) -> InputParam:  # type: ignore  # it should return an InitParam
+        """Trick to avoid mypy issues with dinamyc attributes."""
+        ...
+
+
+class OutputEvents(Params):
+    """Class to manage output events."""
+
+    def declare(self, name: str) -> None:
+        """Add or modify an output event.
+
+        Args:
+            name: name of the parameter.
+
+        """
+        setattr(self, name, OutputEvent(name, parent=self._parent))
+
+    def __getattr__(self, name: str) -> OutputEvent:  # type: ignore  # it should return an OutputEvent
         """Trick to avoid mypy issues with dinamyc attributes."""
         ...
