@@ -257,6 +257,16 @@ class Component(base_class):
         """Get the set of properties for this component."""
         return self._properties
 
+    @property
+    def input_events(self) -> InputEvents:
+        """Get the set of input events for this component."""
+        return self._input_events
+
+    @property
+    def output_events(self) -> OutputEvents:
+        """Get the set of output events for this component."""
+        return self._output_events
+
     @staticmethod
     def register_inputs(inputs: InputParams) -> None:
         """Register the input params.

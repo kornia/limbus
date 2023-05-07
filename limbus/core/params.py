@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 # Note that Component class cannot be imported to avoid circular dependencies.
 # Since it is only used for type hints we import the module and use "component.Component" for typing.
 from limbus.core import component
-from limbus.core.param import Param, NoValue, InputParam, OutputParam, PropertyParam, InputEvent, OutputEvent
+from limbus.core.param import Param, NoValue, InputParam, OutputParam, PropertyParam, InputEvent, OutputEvent, EventType
 
 
 class Params(Iterable, ABC):
@@ -146,9 +146,9 @@ class InputEvents(Params):
                 Prototype: `async def callback(parent: Component) -> None:`
 
         """
-        setattr(self, name, InputEvent(name, parent=self._parent, callback=callback))
+        setattr(self, name, InputEvent(name, tp=EventType, parent=self._parent, callback=callback))
 
-    def __getattr__(self, name: str) -> InputParam:  # type: ignore  # it should return an InitParam
+    def __getattr__(self, name: str) -> InputEvent:  # type: ignore  # it should return an InitEvent
         """Trick to avoid mypy issues with dinamyc attributes."""
         ...
 
@@ -163,7 +163,7 @@ class OutputEvents(Params):
             name: name of the parameter.
 
         """
-        setattr(self, name, OutputEvent(name, parent=self._parent))
+        setattr(self, name, OutputEvent(name, tp=EventType, parent=self._parent))
 
     def __getattr__(self, name: str) -> OutputEvent:  # type: ignore  # it should return an OutputEvent
         """Trick to avoid mypy issues with dinamyc attributes."""

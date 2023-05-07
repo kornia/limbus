@@ -36,6 +36,10 @@ class NoValue:
     """Denote that a param does not have a value."""
     pass
 
+class EventType:
+    """Denote a special type of param to manage Events."""
+    pass
+
 
 @dataclass
 class Container:
@@ -662,9 +666,8 @@ class InputEvent(Param):
                 self._parent.set_state(ComponentState.RECEIVING_EVENTS,
                                        f"{ori_param.parent.name}.{ori_param.name} -> {self._parent.name}.{self.name}")
                 async_utils.create_task_if_needed(self._parent, ori_param.parent)
-            await asyncio.wait(
-                [asyncio.ensure_future(ref.sent.wait()) for ref in self.references if ref.sent is not None],
-                return_when=asyncio.FIRST_COMPLETED)
+            futures = [ref.sent.wait() for ref in self.references if ref.sent is not None]
+            await asyncio.wait(futures, return_when=asyncio.FIRST_COMPLETED)
             # reser all the events
             for ref in self.references:
                 assert isinstance(ref.sent, asyncio.Event)
