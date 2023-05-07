@@ -653,8 +653,8 @@ class OutputParam(Param):
 class InputEvent(Param):
     """Class to manage the comunication for each input event."""
 
-    async def receive(self) -> None:
-        """Wait until the input event is recveived."""
+    async def wait(self) -> None:
+        """Wait until the input event is received."""
         assert self._parent is not None
         if self.references:
             for ref in self.references:
@@ -680,7 +680,7 @@ class InputEvent(Param):
 class OutputEvent(Param):
     """Class to manage the comunication for each output event."""
 
-    async def send(self) -> None:
+    async def fire(self) -> None:
         """Send an event to the connected input events."""
         assert self._parent is not None
         for ref in self.references:
