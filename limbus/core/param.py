@@ -216,6 +216,7 @@ class Reference:
     sent: None | asyncio.Event = None
     # allow to know if the value has been consumed
     consumed: None | asyncio.Event = None
+    disabled: bool = False  # allow to disable the reference (now only used by events)
 
     def __hash__(self) -> int:
         # this method is required to be able to use Reference in a set.
@@ -654,11 +655,19 @@ class OutputParam(Param):
 class InputEvent(Param):
     """Class to manage the comunication for each input event."""
 
+    def disable(self) -> None:
+        """Disable the input event."""
+        assert self._parent is not None
+        for ref in self.references:
+            ref.disabled = True
+
     async def wait(self) -> None:
         """Wait until the input event is received."""
         assert self._parent is not None
         if self.references:
             for ref in self.references:
+                if ref.disabled:
+                    continue
                 # ensure the component related with the output event exists
                 assert ref.param is not None
                 ori_param: Param = ref.param
@@ -667,8 +676,16 @@ class InputEvent(Param):
                 self._parent.set_state(ComponentState.RECEIVING_EVENTS,
                                        f"{ori_param.parent.name}.{ori_param.name} -> {self._parent.name}.{self.name}")
                 async_utils.create_task_if_needed(self._parent, ori_param.parent)
-            futures = [ref.sent.wait() for ref in self.references if ref.sent is not None]
+            futures = [ref.sent.wait() for ref in self.references if ref.sent is not None and ref.disabled is False]
+            if futures == []:
+                # in this case there is nothing to await
+                return
             await asyncio.wait(futures, return_when=asyncio.FIRST_COMPLETED)
+            # if the received event is cancelled then raise an exception to finish the execution of the component.
+            for ref in self.references:
+                # if any event is disabled we asume that the component execution must finish
+                if any([ref.disabled for ref in ref.param.references]):
+                    raise ComponentStoppedError(ComponentState.STOPPED_BY_COMPONENT)
             # reser all the events
             for ref in self.references:
                 assert isinstance(ref.sent, asyncio.Event)
@@ -681,6 +698,12 @@ class InputEvent(Param):
 class OutputEvent(Param):
     """Class to manage the comunication for each output event."""
 
+    def disable(self) -> None:
+        """Disable the output event."""
+        assert self._parent is not None
+        for ref in self.references:
+            ref.disabled = True
+
     async def fire(self) -> None:
         """Send an event to the connected input events."""
         assert self._parent is not None
@@ -689,6 +712,10 @@ class OutputEvent(Param):
             assert isinstance(ref.consumed, asyncio.Event)
             ref.sent.set()  # denote that the event was fired
 
+            if ref.disabled:
+                # In this case we do not want to create a new task to only raise an exception because the event
+                # is disabled.
+                continue
             # ensure the component related with the input event exists
             assert ref.param is not None
             dst_param: Param = ref.param
