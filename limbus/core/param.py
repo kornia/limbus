@@ -660,6 +660,8 @@ class InputEvent(Param):
         assert self._parent is not None
         for ref in self.references:
             ref.disabled = True
+            assert isinstance(ref.sent, asyncio.Event)
+            ref.sent.set()  # unlock the Event task!!!
 
     async def wait(self) -> None:
         """Wait until the input event is received."""
@@ -703,6 +705,8 @@ class OutputEvent(Param):
         assert self._parent is not None
         for ref in self.references:
             ref.disabled = True
+            assert isinstance(ref.sent, asyncio.Event)
+            ref.sent.set()  # unlock the Event task!!!
 
     async def fire(self) -> None:
         """Send an event to the connected input events."""
