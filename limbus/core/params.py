@@ -137,16 +137,22 @@ class OutputParams(Params):
 class InputEvents(Params):
     """Class to manage input events."""
 
-    def declare(self, name: str, callback: Callable | None = None) -> None:
+    def declare(self, name: str, tp: Any = EventType, callback: Callable | None = None) -> None:
         """Add or modify an input event.
 
         Args:
             name: name of the parameter.
+            tp: type of the event. Default: EventType.
+                Current valid types are:
+                    - EventType: any event.
+                    - ComponentEventTypes defined in component.py.
             callback: async callback function to be called when the event is received.
                 Prototype: `async def callback(parent: Component) -> None:`
 
         """
-        setattr(self, name, InputEvent(name, tp=EventType, parent=self._parent, callback=callback))
+        if not issubclass(tp, EventType):
+            raise TypeError(f"Invalid type for event {name}. It must be or inherit from EventType.")
+        setattr(self, name, InputEvent(name, tp=tp, parent=self._parent, callback=callback))
 
     def __getattr__(self, name: str) -> InputEvent:  # type: ignore  # it should return an InitEvent
         """Trick to avoid mypy issues with dinamyc attributes."""
