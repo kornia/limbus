@@ -13,6 +13,7 @@ log = logging.getLogger(__name__)
 
 
 # TODO: test in detail the functions
+@pytest.mark.usefixtures("event_loop_instance")
 class TestPipeline:
     def test_smoke(self):
         man = Pipeline()
