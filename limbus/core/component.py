@@ -181,11 +181,11 @@ class Component(base_class):
         # NOTE that other event types can be managed by the user. Defining the event type as EventType.
         # assign the events to the corresponding event types
         for event in self._input_events:
-            if isinstance(event, BeforeComponentCallEventType):
+            if event.type is BeforeComponentCallEventType:
                 self.__events_to_wait_before_call.__setattr__(event.name, event)
-            elif isinstance(event, BeforeComponentIterEventType):
+            elif event.type is BeforeComponentIterEventType:
                 self.__events_to_wait_before_running.__setattr__(event.name, event)
-            elif isinstance(event, AfterComponentIterEventType):
+            elif event.type is AfterComponentIterEventType:
                 self.__events_to_wait_after_running.__setattr__(event.name, event)
 
         # method called in __run_with_hooks to execute the component forward method

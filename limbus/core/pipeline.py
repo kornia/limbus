@@ -454,7 +454,8 @@ class Pipeline:
             states = []
             for component in self._nodes:
                 states.extend(component.state)
-            if ComponentState.STOPPED in states:
+            # if there are components waiting for events then we cannot set the ENDED state.
+            if len(async_utils.get_component_tasks()) == 0 and ComponentState.STOPPED in states:
                 self._state(PipelineState.ENDED)
             elif ComponentState.ERROR in states:
                 self._state(PipelineState.ERROR)
