@@ -31,7 +31,7 @@ def run_coroutine(coro: Coroutine) -> None:
     loop.run_until_complete(coro)
 
 
-def get_component_tasks(skip_states: None | ComponentState | list[ComponentState] = None ) -> list[asyncio.Task]:
+def get_component_tasks(skip_states: None | ComponentState | list[ComponentState] = None) -> list[asyncio.Task]:
     """Get the tasks associated to the components.
 
     Args:

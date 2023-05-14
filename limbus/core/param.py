@@ -36,6 +36,7 @@ class NoValue:
     """Denote that a param does not have a value."""
     pass
 
+
 class EventType:
     """Denote a special type of param to manage Events."""
     pass
@@ -408,11 +409,11 @@ class Param(ABC):
         if not isinstance(dst, InputEvent):  # input events can be connected to several output events
             if (isinstance(dst, Param) and dst.ref_counter() > 0):
                 raise ValueError(f"An input parameter can only be connected to 1 param. "
-                                f"Dst param '{dst.name}' is connected to {dst._refs}.")
+                                 f"Dst param '{dst.name}' is connected to {dst._refs}.")
 
             if isinstance(dst, IterableParam) and dst.param.ref_counter(dst.index) > 0:
                 raise ValueError(f"An input parameter can only be connected to 1 param. "
-                                f"Dst param '{dst.param.name}' is connected to {dst.param._refs}.")
+                                 f"Dst param '{dst.param.name}' is connected to {dst.param._refs}.")
 
         # connect the param to the dst param
         if isinstance(dst, Param) and isinstance(ori, Param):
@@ -702,6 +703,7 @@ class InputEvent(Param):
                 await self._callback(self._parent)
             return True
         return None
+
 
 class OutputEvent(Param):
     """Class to manage the comunication for each output event."""

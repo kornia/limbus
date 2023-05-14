@@ -385,7 +385,7 @@ class Pipeline:
         async def start() -> None:
             for node in self._nodes:
                 node.set_pipeline(self)
-                # RECEIVING_EVENTS state is the only one that can maintain the component execution loop when asking for 
+                # RECEIVING_EVENTS state is the only one that can maintain the component execution loop when asking for
                 # given number of iters. So, since the component is doing something we do not need to rerun it.
                 # In theory all the rest of components should be in states where the main component loop is not in
                 # execution.

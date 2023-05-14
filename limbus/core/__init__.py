@@ -1,5 +1,5 @@
 from limbus.core.component import (Component, executions_manager, AfterComponentIterEventType,
-                                   BeforeComponentCallEventType, BeforeComponentIterEventType) 
+                                   BeforeComponentCallEventType, BeforeComponentIterEventType)
 from limbus.core.states import ComponentState, PipelineState, VerboseMode
 from limbus.core.param import (NoValue, Reference, InputParam, OutputParam,
                                PropertyParam, InputEvent, OutputEvent, EventType)

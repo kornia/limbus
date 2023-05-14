@@ -4,8 +4,8 @@ import asyncio
 
 import torch
 
-from limbus.core import (
-    Pipeline, PipelineState, VerboseMode, ComponentState, Component, OutputParams, OutputParam, InputParam)
+from limbus.core import (Pipeline, PipelineState, VerboseMode, ComponentState, Component, OutputParams, OutputParam,
+                         InputParam, async_utils)
 from limbus_components.base import Constant, Printer, Adder
 from limbus_components.torch import Unbind
 
@@ -13,7 +13,6 @@ log = logging.getLogger(__name__)
 
 
 # TODO: test in detail the functions
-@pytest.mark.usefixtures("event_loop_instance")
 class TestPipeline:
     def test_smoke(self):
         man = Pipeline()
@@ -78,7 +77,7 @@ class TestPipeline:
         assert isinstance(out, PipelineState)
         assert pipeline.min_iteration_in_progress == 2
 
-    async def test_pipeline_flow(self):
+    def test_pipeline_flow(self):
         c1 = Constant("c1", torch.rand(2, 3))
         show0 = Printer("print0")
         c1.outputs.out.connect(show0.inputs.inp)
@@ -126,7 +125,7 @@ class TestPipeline:
             assert len(show0.state) > 1
             assert ComponentState.FORCED_STOP in show0.state
             assert show0.state_message(ComponentState.FORCED_STOP) is None
-        await task()
+        async_utils.run_coroutine(task())
         assert pipeline.min_iteration_in_progress > 0
         assert pipeline.min_iteration_in_progress < 5
 

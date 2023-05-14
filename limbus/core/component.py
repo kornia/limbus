@@ -52,9 +52,11 @@ class BeforeComponentCallEventType(EventType):
     """Denote a special type of event waited before the execution of the Component."""
     pass
 
+
 class BeforeComponentIterEventType(EventType):
     """Denote a special type of event waited before each Component iteration."""
     pass
+
 
 class AfterComponentIterEventType(EventType):
     """Denote a special type of event waited after each Component iteration."""
@@ -173,11 +175,11 @@ class Component(base_class):
 
         # by default Components can wait for events at 3 execution points:
         # - before running the component in the __call__ method
-        self.__events_to_wait_before_call: InputEvents =  InputEvents(self)
+        self.__events_to_wait_before_call: InputEvents = InputEvents(self)
         # - before running the component in the __run_with_hooks method
         self.__events_to_wait_before_running: InputEvents = InputEvents(self)
         # - after running the component in the __run_with_hooks method
-        self.__events_to_wait_after_running: InputEvents =  InputEvents(self)
+        self.__events_to_wait_after_running: InputEvents = InputEvents(self)
         # NOTE that other event types can be managed by the user. Defining the event type as EventType.
         # assign the events to the corresponding event types
         for event in self._input_events:
@@ -426,7 +428,7 @@ class Component(base_class):
                 states = await asyncio.gather(*[event.wait() for event in events if isinstance(event, InputEvent)])
                 # if the event is not connected to any other event
                 if states.count(None) == len(states):
-                     return None
+                    return None
                 # if the event is connected to disabled events
                 elif states.count(False) == len(states):
                     return True
