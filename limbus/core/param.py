@@ -663,8 +663,13 @@ class InputEvent(Param):
             assert isinstance(ref.sent, asyncio.Event)
             ref.sent.set()  # unlock the Event task!!!
 
-    async def wait(self) -> None:
-        """Wait until the input event is received."""
+    async def wait(self) -> None | bool:
+        """Wait until the input event is received.
+
+        Returns:
+            None | bool: denoting if the event is connected to enabled events. None if the event is not connected.
+
+        """
         assert self._parent is not None
         if self.references:
             for ref in self.references:
@@ -681,7 +686,7 @@ class InputEvent(Param):
             futures = [ref.sent.wait() for ref in self.references if ref.sent is not None and ref.disabled is False]
             if futures == []:
                 # in this case there is nothing to await
-                return
+                return False
             await asyncio.wait(futures, return_when=asyncio.FIRST_COMPLETED)
             # if the received event is cancelled then raise an exception to finish the execution of the component.
             for ref in self.references:
@@ -695,7 +700,8 @@ class InputEvent(Param):
             # exec the callback
             if self._callback is not None:
                 await self._callback(self._parent)
-
+            return True
+        return None
 
 class OutputEvent(Param):
     """Class to manage the comunication for each output event."""
