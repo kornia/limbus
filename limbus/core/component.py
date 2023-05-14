@@ -14,7 +14,8 @@ except ImportError:
     pass
 
 from limbus_config import config
-from limbus.core.params import InputParams, OutputParams, PropertyParams, InputEvents, OutputEvents
+from limbus.core.params import (InputParams, OutputParams, PropertyParams, InputEvents, OutputEvents, InputEvent,
+                                EventType)
 from limbus.core.states import ComponentState, ComponentStoppedError
 # Note that Pipeline class cannot be imported to avoid circular dependencies.
 if TYPE_CHECKING:
@@ -44,6 +45,20 @@ def executions_manager(func: Callable) -> Callable:
             self.stopping_execution = self.pipeline.get_component_stopping_iteration(self)
         return await func(self, *args, **kwargs)
     return wrapper_set_iteration
+
+
+# Component EventTypes
+class BeforeComponentCallEventType(EventType):
+    """Denote a special type of event waited before the execution of the Component."""
+    pass
+
+class BeforeComponentIterEventType(EventType):
+    """Denote a special type of event waited before each Component iteration."""
+    pass
+
+class AfterComponentIterEventType(EventType):
+    """Denote a special type of event waited after each Component iteration."""
+    pass
 
 
 class _ComponentState():
@@ -155,6 +170,23 @@ class Component(base_class):
         # Last execution to be run in the __call__ loop.
         self.__stopping_execution: int = 0  # 0 means run forever
         self.__num_params_waiting_to_receive: int = 0  # updated from InputParam
+
+        # by default Components can wait for events at 3 execution points:
+        # - before running the component in the __call__ method
+        self.__events_to_wait_before_call: InputEvents =  InputEvents(self)
+        # - before running the component in the __run_with_hooks method
+        self.__events_to_wait_before_running: InputEvents = InputEvents(self)
+        # - after running the component in the __run_with_hooks method
+        self.__events_to_wait_after_running: InputEvents =  InputEvents(self)
+        # NOTE that other event types can be managed by the user. Defining the event type as EventType.
+        # assign the events to the corresponding event types
+        for event in self._input_events:
+            if isinstance(event, BeforeComponentCallEventType):
+                self.__events_to_wait_before_call.__setattr__(event.name, event)
+            elif isinstance(event, BeforeComponentIterEventType):
+                self.__events_to_wait_before_running.__setattr__(event.name, event)
+            elif isinstance(event, AfterComponentIterEventType):
+                self.__events_to_wait_after_running.__setattr__(event.name, event)
 
         # method called in __run_with_hooks to execute the component forward method
         self.__run_forward: Callable[..., Coroutine[Any, Any, ComponentState]] = self.forward
@@ -363,6 +395,8 @@ class Component(base_class):
         NOTE 2: if you override this method you must add the `executions_manager` decorator.
 
         """
+        if await self.__gather_events(self.__events_to_wait_before_call) is True:
+            return
         while True:
             if await self.__run_with_hooks():
                 break
@@ -385,7 +419,26 @@ class Component(base_class):
             return True
         return False
 
+    async def __gather_events(self, events: InputEvents) -> bool | None:
+        """Return true/false wether execution must finish now or not and None if it is unknown."""
+        if len(events) > 0:
+            try:
+                states = await asyncio.gather(*[event.wait() for event in events if isinstance(event, InputEvent)])
+                # if the event is not connected to any other event
+                if states.count(None) == len(states):
+                     return None
+                # if the event is connected to disabled events
+                elif states.count(False) == len(states):
+                    return True
+                return False
+            except ComponentStoppedError as e:
+                self.set_state(e.state, e.message, add=True)
+                return True
+        return None
+
     async def __run_with_hooks(self, *args, **kwargs) -> bool:
+        if await self.__gather_events(self.__events_to_wait_before_running) is True:
+            return True
         self.__exec_counter += 1
         if self.__pipeline is not None:
             await self.__pipeline.before_component_hook(self)
@@ -405,16 +458,20 @@ class Component(base_class):
             self.set_state(ComponentState.ERROR, f"{type(e).__name__} - {str(e)}")
             log.error(f"Error in component {self.name}.\n"
                       f"{''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        ret_val = True
         if self.__pipeline is not None:
             # after component hook
             await self.__pipeline.after_component_hook(self)
             if self.__pipeline.after_component_user_hook:
                 await self.__pipeline.after_component_user_hook(self)
-            if self.__stop_if_needed():
-                return True
-            return False
+            if not self.__stop_if_needed():
+                ret_val = False
+        # NOTE that evetns without pipeline are not properly controlled
+        res = await self.__gather_events(self.__events_to_wait_after_running)
+        if res is not None:
+            ret_val = res
         # if there is not a pipeline, the component is executed only once
-        return True
+        return ret_val if self.__pipeline is not None else True
 
     @abstractmethod
     async def forward(self, *args, **kwargs) -> ComponentState:
