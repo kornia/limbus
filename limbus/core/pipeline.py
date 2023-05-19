@@ -428,15 +428,9 @@ class Pipeline:
         # when the next iteration starts, so we disabled.
         # ATTENTION: We recommend to use this feature only for debugging!!!
         self._min_number_of_iters_to_run = 0
-        # if there are hooks then iters must be run one by one forever
-        if self._before_iteration_user_hook is not None or self._after_iteration_user_hook is not None:
+        # if there is a limit in the number of iters or there are hooks then iters must be run one by one forever
+        if iters > 0 or self._before_iteration_user_hook is not None or self._after_iteration_user_hook is not None:
             self._min_number_of_iters_to_run = 1
-
-        # If there are no hooks but there is a limit in the number of iters we only set 1 iters but running all the
-        # required iters.
-        if self._min_number_of_iters_to_run == 0:
-            self._min_number_of_iters_to_run = iters
-            iters = 1
 
         # run the pipeline as independent iterations. The loop is only run ince if there are no hooks.
         self.resume()  # change the state to running
