@@ -7,8 +7,11 @@ from typing import Coroutine, TYPE_CHECKING
 if TYPE_CHECKING:
     from limbus.core.component import Component, ComponentState
 
-# Get the loop that is going to run the pipeline. Doing it in this way allows to rerun the pipeline.
-loop = asyncio.new_event_loop()
+# Get the loop that is going to run the pipeline.
+try:
+    loop = asyncio.get_running_loop()
+except RuntimeError:
+    loop = asyncio.new_event_loop()
 
 
 def reset_loop() -> asyncio.AbstractEventLoop:
