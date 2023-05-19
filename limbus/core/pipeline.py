@@ -383,21 +383,25 @@ class Pipeline:
         self._stop_event.clear()
 
         async def start() -> None:
-            tasks: list[Coroutine[Any, Any, None]] = []
             for node in self._nodes:
                 node.set_pipeline(self)
-                tasks.append(node())
-                # set the initial state of the components if they are not already set
-                if self._iteration_component_state.get(node, None) is None:
-                    self._iteration_component_state[node] = (IterationState.COMPONENT_NOT_EXECUTED, 0)
-            await asyncio.gather(*tasks)
-            # check if there are pending tasks
-            pending_tasks: list = []
-            for node in self._nodes:
-                t = async_utils.get_task_if_exists(node)
-                if t is not None:
-                    pending_tasks.append(t)
-            await asyncio.gather(*pending_tasks)
+                # RECEIVING_EVENTS state is the only one that can maintain the component execution loop when asking for
+                # given number of iters. So, since the component is doing something we do not need to rerun it.
+                # In theory all the rest of components should be in states where the main component loop is not in
+                # execution.
+                if ComponentState.RECEIVING_EVENTS not in node.state:
+                    async_utils.loop.create_task(node())
+                    # set the initial state of the components if they are not already set
+                    if self._iteration_component_state.get(node, None) is None:
+                        self._iteration_component_state[node] = (IterationState.COMPONENT_NOT_EXECUTED, 0)
+            while True:
+                if self._min_number_of_iters_to_run == 0:
+                    tasks = async_utils.get_component_tasks()
+                else:
+                    tasks = async_utils.get_component_tasks(ComponentState.RECEIVING_EVENTS)
+                if len(tasks) == 0:
+                    break
+                await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
         # if it was previously run then the state is not changed to STARTED
         if self._state.state == PipelineState.INITIALIZING:
@@ -424,15 +428,9 @@ class Pipeline:
         # when the next iteration starts, so we disabled.
         # ATTENTION: We recommend to use this feature only for debugging!!!
         self._min_number_of_iters_to_run = 0
-        # if there are hooks then iters must be run one by one forever
-        if self._before_iteration_user_hook is not None or self._after_iteration_user_hook is not None:
+        # if there is a limit in the number of iters or there are hooks then iters must be run one by one forever
+        if iters > 0 or self._before_iteration_user_hook is not None or self._after_iteration_user_hook is not None:
             self._min_number_of_iters_to_run = 1
-
-        # If there are no hooks but there is a limit in the number of iters we only set 1 iters but running all the
-        # required iters.
-        if self._min_number_of_iters_to_run == 0:
-            self._min_number_of_iters_to_run = iters
-            iters = 1
 
         # run the pipeline as independent iterations. The loop is only run ince if there are no hooks.
         self.resume()  # change the state to running
@@ -450,7 +448,8 @@ class Pipeline:
             states = []
             for component in self._nodes:
                 states.extend(component.state)
-            if ComponentState.STOPPED in states:
+            # if there are components waiting for events then we cannot set the ENDED state.
+            if len(async_utils.get_component_tasks()) == 0 and ComponentState.STOPPED in states:
                 self._state(PipelineState.ENDED)
             elif ComponentState.ERROR in states:
                 self._state(PipelineState.ERROR)
@@ -458,6 +457,7 @@ class Pipeline:
             if self._state.state in [PipelineState.FORCED_STOP, PipelineState.ERROR, PipelineState.ENDED]:
                 break
 
+        # if the pipeline has not finished then it is paused (state changed to PAUSED)
         if not forever and self._state.state == PipelineState.RUNNING:
             self.pause()
 

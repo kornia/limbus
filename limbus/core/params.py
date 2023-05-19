@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 # Note that Component class cannot be imported to avoid circular dependencies.
 # Since it is only used for type hints we import the module and use "component.Component" for typing.
 from limbus.core import component
-from limbus.core.param import Param, NoValue, InputParam, OutputParam, PropertyParam
+from limbus.core.param import Param, NoValue, InputParam, OutputParam, PropertyParam, InputEvent, OutputEvent, EventType
 
 
 class Params(Iterable, ABC):
@@ -130,5 +130,47 @@ class OutputParams(Params):
         setattr(self, name, OutputParam(name, tp, NoValue(), arg, self._parent, callback))
 
     def __getattr__(self, name: str) -> OutputParam:  # type: ignore  # it should return an OutputParam
+        """Trick to avoid mypy issues with dinamyc attributes."""
+        ...
+
+
+class InputEvents(Params):
+    """Class to manage input events."""
+
+    def declare(self, name: str, tp: Any = EventType, callback: Callable | None = None) -> None:
+        """Add or modify an input event.
+
+        Args:
+            name: name of the parameter.
+            tp: type of the event. Default: EventType.
+                Current valid types are:
+                    - EventType: any event.
+                    - ComponentEventTypes defined in component.py.
+            callback: async callback function to be called when the event is received.
+                Prototype: `async def callback(parent: Component) -> None:`
+
+        """
+        if not issubclass(tp, EventType):
+            raise TypeError(f"Invalid type for event {name}. It must be or inherit from EventType.")
+        setattr(self, name, InputEvent(name, tp=tp, parent=self._parent, callback=callback))
+
+    def __getattr__(self, name: str) -> InputEvent:  # type: ignore  # it should return an InitEvent
+        """Trick to avoid mypy issues with dinamyc attributes."""
+        ...
+
+
+class OutputEvents(Params):
+    """Class to manage output events."""
+
+    def declare(self, name: str) -> None:
+        """Add or modify an output event.
+
+        Args:
+            name: name of the parameter.
+
+        """
+        setattr(self, name, OutputEvent(name, tp=EventType, parent=self._parent))
+
+    def __getattr__(self, name: str) -> OutputEvent:  # type: ignore  # it should return an OutputEvent
         """Trick to avoid mypy issues with dinamyc attributes."""
         ...

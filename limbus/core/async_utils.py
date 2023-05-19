@@ -5,10 +5,13 @@ import inspect
 from typing import Coroutine, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from limbus.core.component import Component
+    from limbus.core.component import Component, ComponentState
 
-# Get the loop that is going to run the pipeline. Doing it in this way allows to rerun the pipeline.
-loop = asyncio.new_event_loop()
+# Get the loop that is going to run the pipeline.
+try:
+    loop = asyncio.get_running_loop()
+except RuntimeError:
+    loop = asyncio.new_event_loop()
 
 
 def reset_loop() -> asyncio.AbstractEventLoop:
@@ -29,6 +32,36 @@ def run_coroutine(coro: Coroutine) -> None:
     if loop.is_closed():
         loop = reset_loop()
     loop.run_until_complete(coro)
+
+
+def get_component_tasks(skip_states: None | ComponentState | list[ComponentState] = None) -> list[asyncio.Task]:
+    """Get the tasks associated to the components.
+
+    Args:
+        skip_states: skip components in the given states.
+
+    Returns:
+        list[asyncio.Task]: tasks associated to the components.
+
+    """
+    if skip_states is None:
+        skip_states = []
+    elif not isinstance(skip_states, list):  # if it is not a list, convert it to a list
+        skip_states = [skip_states]
+    tasks: list[asyncio.Task] = []
+    for task in asyncio.all_tasks():
+        coro = task.get_coro()
+        assert isinstance(coro, Coroutine)
+        cr_locals = inspect.getcoroutinelocals(coro)
+        if "self" in cr_locals:
+            try:
+                # cannot check if self is an instance of Component because it generates a circular import
+                if hasattr(cr_locals["self"], "register_inputs"):  # trick to check if it is a component
+                    if len(skip_states) == 0 or not set(cr_locals["self"].state).intersection(set(skip_states)):
+                        tasks.append(task)
+            except:
+                pass
+    return tasks
 
 
 def get_task_if_exists(component: Component) -> None | asyncio.Task:

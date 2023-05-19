@@ -37,6 +37,11 @@ class NoValue:
     pass
 
 
+class EventType:
+    """Denote a special type of param to manage Events."""
+    pass
+
+
 @dataclass
 class Container:
     """Denote that a param has a value."""
@@ -212,6 +217,7 @@ class Reference:
     sent: None | asyncio.Event = None
     # allow to know if the value has been consumed
     consumed: None | asyncio.Event = None
+    disabled: bool = False  # allow to disable the reference (now only used by events)
 
     def __hash__(self) -> int:
         # this method is required to be able to use Reference in a set.
@@ -400,13 +406,14 @@ class Param(ABC):
 
         # TODO: check that dst param is an input param
         # TODO: check type compatibility
-        if (isinstance(dst, Param) and dst.ref_counter() > 0):
-            raise ValueError(f"An input parameter can only be connected to 1 param. "
-                             f"Dst param '{dst.name}' is connected to {dst._refs}.")
+        if not isinstance(dst, InputEvent):  # input events can be connected to several output events
+            if (isinstance(dst, Param) and dst.ref_counter() > 0):
+                raise ValueError(f"An input parameter can only be connected to 1 param. "
+                                 f"Dst param '{dst.name}' is connected to {dst._refs}.")
 
-        if isinstance(dst, IterableParam) and dst.param.ref_counter(dst.index) > 0:
-            raise ValueError(f"An input parameter can only be connected to 1 param. "
-                             f"Dst param '{dst.param.name}' is connected to {dst.param._refs}.")
+            if isinstance(dst, IterableParam) and dst.param.ref_counter(dst.index) > 0:
+                raise ValueError(f"An input parameter can only be connected to 1 param. "
+                                 f"Dst param '{dst.param.name}' is connected to {dst.param._refs}.")
 
         # connect the param to the dst param
         if isinstance(dst, Param) and isinstance(ori, Param):
@@ -644,3 +651,88 @@ class OutputParam(Param):
             # if we want to stop at a given min iter then it is posible to require more iters
             if ComponentState.STOPPED_AT_ITER not in ref.param.parent.state and ref.param.parent.is_stopped():
                 raise ComponentStoppedError(ComponentState.STOPPED_BY_COMPONENT)
+
+
+class InputEvent(Param):
+    """Class to manage the comunication for each input event."""
+
+    def disable(self) -> None:
+        """Disable the input event."""
+        assert self._parent is not None
+        for ref in self.references:
+            ref.disabled = True
+            assert isinstance(ref.sent, asyncio.Event)
+            ref.sent.set()  # unlock the Event task!!!
+
+    async def wait(self) -> None | bool:
+        """Wait until the input event is received.
+
+        Returns:
+            None | bool: denoting if the event is connected to enabled events. None if the event is not connected.
+
+        """
+        assert self._parent is not None
+        if self.references:
+            for ref in self.references:
+                if ref.disabled:
+                    continue
+                # ensure the component related with the output event exists
+                assert ref.param is not None
+                ori_param: Param = ref.param
+                assert isinstance(ori_param, OutputEvent)  # they must be of type OutputEvent
+                assert ori_param.parent is not None
+                self._parent.set_state(ComponentState.RECEIVING_EVENTS,
+                                       f"{ori_param.parent.name}.{ori_param.name} -> {self._parent.name}.{self.name}")
+                async_utils.create_task_if_needed(self._parent, ori_param.parent)
+            futures = [ref.sent.wait() for ref in self.references if ref.sent is not None and ref.disabled is False]
+            if futures == []:
+                # in this case there is nothing to await
+                return False
+            await asyncio.wait(futures, return_when=asyncio.FIRST_COMPLETED)
+            # if the received event is cancelled then raise an exception to finish the execution of the component.
+            for ref in self.references:
+                # if any event is disabled we asume that the component execution must finish
+                if any([ref.disabled for ref in ref.param.references]):
+                    raise ComponentStoppedError(ComponentState.STOPPED_BY_COMPONENT)
+            # reser all the events
+            for ref in self.references:
+                assert isinstance(ref.sent, asyncio.Event)
+                ref.sent.clear()  # allow to know to the sender that it can send again
+            # exec the callback
+            if self._callback is not None:
+                await self._callback(self._parent)
+            return True
+        return None
+
+
+class OutputEvent(Param):
+    """Class to manage the comunication for each output event."""
+
+    def disable(self) -> None:
+        """Disable the output event."""
+        assert self._parent is not None
+        for ref in self.references:
+            ref.disabled = True
+            assert isinstance(ref.sent, asyncio.Event)
+            ref.sent.set()  # unlock the Event task!!!
+
+    async def fire(self) -> None:
+        """Send an event to the connected input events."""
+        assert self._parent is not None
+        for ref in self.references:
+            assert isinstance(ref.sent, asyncio.Event)
+            assert isinstance(ref.consumed, asyncio.Event)
+            ref.sent.set()  # denote that the event was fired
+
+            if ref.disabled:
+                # In this case we do not want to create a new task to only raise an exception because the event
+                # is disabled.
+                continue
+            # ensure the component related with the input event exists
+            assert ref.param is not None
+            dst_param: Param = ref.param
+            assert isinstance(dst_param, InputEvent)  # they must be of type InputEvent
+            assert dst_param.parent is not None
+            self._parent.set_state(ComponentState.SENDING_EVENTS,
+                                   f"{self._parent.name}.{self.name} -> {dst_param.parent.name}.{dst_param.name}")
+            async_utils.create_task_if_needed(self._parent, dst_param.parent)
