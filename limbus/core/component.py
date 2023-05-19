@@ -259,6 +259,10 @@ class Component(base_class):
             add (optional): if True, the state is added to the list of states. Default: False.
 
         """
+        if sum([ev.ref_counter() for ev in self.input_events]) > 0 and state == ComponentState.STOPPED_AT_ITER:
+            # if there are input events the component cannot be stopped at iter. So the state is not changed and the
+            # component will continue in execution.
+            return
         self.__state(state, msg, add)
 
     @property
