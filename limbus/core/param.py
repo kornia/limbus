@@ -126,20 +126,25 @@ def _check_subscriptable(datatype: type) -> bool:
     # we need to know if it is a variable size datatype, we assume that all the sequences are variable size
     # if they contain tensors. E.g. list[Tensor], tuple[Tensor], Sequence[Tensor].
     # Note that e.g. for the case tuple[Tensor, Tensor] we don't assume it is variable since the size is known.
-    origin = typing.get_origin(datatype)
-    if origin is None:  # discard datatypes that are not typing expressions
+    # Note if the datatype cannot be instantiated (e.g. a Union), we assume it is not subscriptable. I.e.
+    # isinstance(origin(), typing.Iterable) will fail instantiating the datatype.
+    try:
+        origin = typing.get_origin(datatype)
+        if origin is None:  # discard datatypes that are not typing expressions
+            return False
+        datatype_args: tuple = typing.get_args(datatype)
+        if inspect.isclass(origin):
+            is_abstract: bool = inspect.isabstract(origin)
+            is_abstract_seq: bool = origin is collections.abc.Sequence or origin is collections.abc.Iterable
+            # mypy complaints in the case origin is NoneType
+            if is_abstract_seq or (not is_abstract and isinstance(origin(), typing.Iterable)):  # type: ignore
+                if (len(datatype_args) == 1 or (len(datatype_args) == 2 and Ellipsis in datatype_args)):
+                    if datatype_args[0] in SUBSCRIPTABLE_TYPES:
+                        return True
         return False
-    datatype_args: tuple = typing.get_args(datatype)
-    if inspect.isclass(origin):
-        is_abstract: bool = inspect.isabstract(origin)
-        is_abstract_seq: bool = origin is collections.abc.Sequence or origin is collections.abc.Iterable
-        # mypy complaints in the case origin is NoneType
-        if is_abstract_seq or (not is_abstract and isinstance(origin(), typing.Iterable)):  # type: ignore
-            if (len(datatype_args) == 1 or (len(datatype_args) == 2 and Ellipsis in datatype_args)):
-                if datatype_args[0] in SUBSCRIPTABLE_TYPES:
-                    return True
-    return False
-
+    except TypeError:
+        # if we cannot instantiate the origin of the datatype, we assume it is not subscriptable
+        return False
 
 class IterableParam:
     """Temporal class to manage indexing inside a parameter."""
