@@ -14,6 +14,7 @@ try:
     import torch
     import kornia
     import numpy as np
+    import plotly.graph_objs as go
 except ImportError:
     pass
 
@@ -163,6 +164,18 @@ class Viz:
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def show_plotly_plot(self, component: Component, title: str, fig: go.Figure) -> None:
+        """Show a plotly plot.
+
+        Args:
+            component: component that calls this method.
+            title: Title of the window.
+            fig: Plotly figure.
+
+        """
+        raise NotImplementedError
+
 
 class Visdom(Viz):
     """Visdom visualization backend."""
@@ -256,6 +269,20 @@ class Visdom(Viz):
         opts = {"title": title}
         self._vis.text(text, win=title, append=append, opts=opts)
 
+    @is_enabled
+    @set_title
+    def show_plotly_plot(self, component: Component, title: str, fig: go.Figure) -> None:
+        """Show a plotly plot.
+
+        Args:
+            component: component that calls this method.
+            title: Title of the window.
+            fig: Plotly figure.
+
+        """
+        assert self._vis is not None, "Visdom is not initialized."
+        self._vis.plotlyplot(fig, win=title)
+
 
 class Console(Viz):
     """COnsole visualization backend."""
@@ -312,6 +339,19 @@ class Console(Viz):
 
         """
         log.info(f" {title}: {text}")
+
+    @is_enabled
+    @set_title
+    def show_plotly_plot(self, component: Component, title: str, fig: go.Figure) -> None:
+        """Show a plotly plot.
+
+        Args:
+            component: component that calls this method.
+            title: Title of the window.
+            fig: Plotly figure.
+
+        """
+        log.warning("Console visualization does not show plots.")
 
 
 class OpenCV(Console):
