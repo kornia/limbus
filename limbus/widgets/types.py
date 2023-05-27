@@ -15,6 +15,7 @@ try:
     import kornia
     import numpy as np
     import plotly.graph_objs as go
+    import plotly
 except ImportError:
     pass
 
@@ -442,3 +443,24 @@ class OpenCV(Console):
             j = idx // nrow
             grid[:, j * h:j * h + images.shape[2], i * w:i * w + images.shape[3]] = images[idx]
         self.show_image(component, title, grid)
+
+
+    @is_enabled
+    @set_title
+    def show_plotly_plot(self, component: Component, title: str, fig: go.Figure) -> None:
+        """Show a plotly plot.
+
+        Args:
+            component: component that calls this method.
+            title: Title of the window.
+            fig: Plotly figure.
+
+        """
+        img_bytes = plotly.io.to_image(fig, format='png')
+
+        # Decode the image from memory using OpenCV
+        img_array = np.frombuffer(img_bytes, dtype=np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        self.show_image(component, title, kornia.utils.image_to_tensor(img))

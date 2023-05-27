@@ -32,6 +32,8 @@ setup(name='limbus',
               'numpy',
               'visdom',
               'opencv-python',
+              'plotly',
+              'kaleido'  # required to export plotly figs to image
           ]
       },
       packages=find_packages(where='.'),
