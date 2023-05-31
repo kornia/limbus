@@ -140,13 +140,19 @@ class InputEvents(Params):
     def declare(self, name: str, tp: Any = EventType, callback: Callable | None = None) -> None:
         """Add or modify an input event.
 
+        Note: InputEvents do not need to be awaited but they can if the receiving component must be blocked.
+              There are 4 types of events:
+                - EventType: any event. You can use as you want: blocking/non blocking, exec a callback...
+                - ComponentEventTypes defined in component.py. They are blocking events. They can also exec a callback.
+
         Args:
             name: name of the parameter.
             tp: type of the event. Default: EventType.
                 Current valid types are:
                     - EventType: any event.
                     - ComponentEventTypes defined in component.py.
-            callback: async callback function to be called when the event is received.
+            callback: async callback function to be called when the event is sent. Note that it is executed before
+                awaiting the event (if it is awaited).
                 Prototype: `async def callback(parent: Component) -> None:`
 
         """

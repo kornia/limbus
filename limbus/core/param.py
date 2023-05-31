@@ -661,6 +661,11 @@ class OutputParam(Param):
 class InputEvent(Param):
     """Class to manage the comunication for each input event."""
 
+    @property
+    def callback(self) -> Callable | None:
+        """Return the callback function."""
+        return self._callback
+
     def disable(self) -> None:
         """Disable the input event."""
         assert self._parent is not None
@@ -741,3 +746,9 @@ class OutputEvent(Param):
             self._parent.set_state(ComponentState.SENDING_EVENTS,
                                    f"{self._parent.name}.{self.name} -> {dst_param.parent.name}.{dst_param.name}")
             async_utils.create_task_if_needed(self._parent, dst_param.parent)
+
+            assert isinstance(ref.param, InputEvent)
+            if ref.param.callback is not None:
+                # Specific callbacks for this param to ber exec in the dst param.
+                # Calling them from here avoids requiring to wait for the signal there.
+                await ref.param.callback(ref.param.parent)
