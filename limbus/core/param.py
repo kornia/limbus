@@ -42,6 +42,22 @@ class EventType:
     pass
 
 
+# Component EventTypes (defiend here to avoid circular dependencies)
+class BeforeComponentCallEventType(EventType):
+    """Denote a special type of event waited before the execution of the Component."""
+    pass
+
+
+class BeforeComponentIterEventType(EventType):
+    """Denote a special type of event waited before each Component iteration."""
+    pass
+
+
+class AfterComponentIterEventType(EventType):
+    """Denote a special type of event waited after each Component iteration."""
+    pass
+
+
 @dataclass
 class Container:
     """Denote that a param has a value."""
@@ -691,8 +707,18 @@ class InputEvent(Param):
                 ori_param: Param = ref.param
                 assert isinstance(ori_param, OutputEvent)  # they must be of type OutputEvent
                 assert ori_param.parent is not None
+                # add=True for those events that are waited out of the forward method. So, the ones defined
+                # in the component.py file and are awaited there.
+                add: bool = False
+                if self.type in [# BeforeComponentCallEventType,  # probably this one is not needed here
+                                 # BeforeComponentIterEventType,  # probably this one is not needed here
+                                 # This is required since it is awaited after executing the forward and changes the
+                                 # state of the component.
+                                 AfterComponentIterEventType]:
+                    add = True
                 self._parent.set_state(ComponentState.RECEIVING_EVENTS,
-                                       f"{ori_param.parent.name}.{ori_param.name} -> {self._parent.name}.{self.name}")
+                                       f"{ori_param.parent.name}.{ori_param.name} -> {self._parent.name}.{self.name}",
+                                       add=add)
                 async_utils.create_task_if_needed(self._parent, ori_param.parent)
             futures = [ref.sent.wait() for ref in self.references if ref.sent is not None and ref.disabled is False]
             if futures == []:
@@ -708,9 +734,6 @@ class InputEvent(Param):
             for ref in self.references:
                 assert isinstance(ref.sent, asyncio.Event)
                 ref.sent.clear()  # allow to know to the sender that it can send again
-            # exec the callback
-            if self._callback is not None:
-                await self._callback(self._parent)
             return True
         return None
 
