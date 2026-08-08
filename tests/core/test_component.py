@@ -1,7 +1,7 @@
 import pytest
 import logging
 
-from limbus.core import Component, ComponentState, Pipeline
+from limbus.core import Component, ComponentState, Pipeline, PipelineState
 from limbus.core.component import _ComponentState
 
 
@@ -160,9 +160,26 @@ class TestComponentWithPipeline:
         pipeline = Pipeline()
         pipeline.add_nodes(cmp)
         pipeline.run(iters)
+        assert pipeline.state == PipelineState.ENDED
         assert cmp.executions_counter == 1
         assert pipeline.min_iteration_in_progress == 1
-        assert cmp.stopping_execution == iters
+        assert cmp.stopping_execution == int(iters > 0)
+
+
+    def test_get_stopping_iteration_2(self):
+        class A(Component):
+            async def forward(self):
+                return ComponentState.OK
+
+        cmp = A("yuhu")
+        pipeline = Pipeline()
+        pipeline.add_nodes(cmp)
+        pipeline.run(2)
+        # assert pipeline.state == PipelineState.S
+        assert cmp.executions_counter == 2
+        assert pipeline.min_iteration_in_progress == 2
+        assert cmp.stopping_execution == 2
+
 
     def test_stop_after_exception(self):
         class A(Component):
@@ -173,6 +190,7 @@ class TestComponentWithPipeline:
         pipeline = Pipeline()
         pipeline.add_nodes(cmp)
         pipeline.run(2)
+        assert pipeline.state == PipelineState.ERROR
         assert cmp.executions_counter == 1
         assert pipeline.min_iteration_in_progress == 1
         assert cmp.state == [ComponentState.ERROR]
